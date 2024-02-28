@@ -63,7 +63,14 @@ require("lazy").setup({
     "windwp/nvim-ts-autotag",
     "numToStr/Comment.nvim",
     "kylechui/nvim-surround",
-    "kristijanhusak/vim-dadbod-ui"
+    "kristijanhusak/vim-dadbod-ui",
+    -- Language specific
+    {
+        "ray-x/go.nvim",
+        -- install required binaries
+        build=':lua require("go.install).update_all_sync()',
+        ft = {"go", "gomod"}
+    }
 })
 
 -- Essential key mappings
@@ -134,6 +141,12 @@ set.sidescroll = 1
 
 -- Color
 set.background = "dark"
+require("tokyonight").setup({
+    styles = {
+        -- comments = { fg = "#6e7596" }
+        comments = { fg = "#7b83a6" }
+    }
+})
 cmd("colorscheme tokyonight-night")
 
 -- Statusline
@@ -209,7 +222,7 @@ cmp.setup({
 require("mason").setup()
 
 require("mason-lspconfig").setup({
-    ensure_installed = { "cssls", "quick_lint_js", "tsserver", "pyright", "r_language_server", "sqlls", "yamlls", "html", "marksman", "volar", "svelte" }
+    ensure_installed = { "cssls", "quick_lint_js", "tsserver", "pyright", "r_language_server", "sqlls", "yamlls", "html", "marksman", "volar", "svelte", "gopls" }
 })
 
 local lspconfig = require("lspconfig")
@@ -222,6 +235,8 @@ lspconfig.sqlls.setup({})
 lspconfig.html.setup({})
 lspconfig.marksman.setup({})
 lspconfig.yamlls.setup({})
+lspconfig.svelte.setup({})
+lspconfig.gopls.setup({})
 
 map('n', '<space>e', vim.diagnostic.open_float)
 map('n', '[d', vim.diagnostic.goto_prev)
@@ -277,7 +292,7 @@ map('n', '<leader>gR', '<cmd>TroubleToggle lsp_references<cr>')
 
 -- Treesitter
 require("nvim-treesitter.configs").setup({
-    ensure_installed = { "lua", "vim", "vimdoc", "css", "json", "javascript", "latex", "python", "r", "regex", "scss", "yaml", "html", "css", "vue", "svelte" },
+    ensure_installed = { "lua", "vim", "vimdoc", "css", "json", "javascript", "latex", "python", "r", "regex", "scss", "yaml", "html", "css", "vue", "svelte", "go", "typescript" },
     highlight = {
         enable = true,
         additional_vim_regex_highlighting = true
@@ -291,7 +306,16 @@ require("nvim-treesitter.configs").setup({
         enable = true
     },
     yaml = {
-
+        enable = true
+    },
+    go = {
+        enable = true
+    },
+    typescript = {
+        enable = true
+    },
+    svelte = {
+        enable = true
     }
 })
 
@@ -319,4 +343,6 @@ require("nvim-ts-autotag").setup({})
 require('Comment').setup({})
 require("nvim-surround").setup({})
 
+-- Language specific
 
+-- require("go").setup({});
