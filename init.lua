@@ -70,7 +70,8 @@ require("lazy").setup({
         -- install required binaries
         build=':lua require("go.install).update_all_sync()',
         ft = {"go", "gomod"}
-    }
+    },
+    "mrcjkb/rustaceanvim"
 })
 
 -- Essential key mappings
