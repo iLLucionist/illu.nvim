@@ -292,7 +292,7 @@ map('n', '<leader>gR', '<cmd>TroubleToggle lsp_references<cr>')
 
 -- Treesitter
 require("nvim-treesitter.configs").setup({
-    ensure_installed = { "lua", "vim", "vimdoc", "css", "json", "javascript", "latex", "python", "r", "regex", "scss", "yaml", "html", "css", "vue", "svelte", "go", "typescript" },
+    ensure_installed = { "lua", "vim", "vimdoc", "css", "json", "javascript", "latex", "python", "r", "regex", "scss", "yaml", "html", "css", "vue", "svelte", "go", "typescript", "sql" },
     highlight = {
         enable = true,
         additional_vim_regex_highlighting = true
@@ -315,6 +315,9 @@ require("nvim-treesitter.configs").setup({
         enable = true
     },
     svelte = {
+        enable = true
+    },
+    sql = {
         enable = true
     }
 })
