@@ -4,6 +4,11 @@
 
 vim.g.mapleader = " "
 
+-- Disable netrw in favor of nvim tree later on
+
+vim.g.loaded_netrw = 1
+vim.g.loaded_netrwPllugin = 1
+
 local set = vim.opt
 local map = vim.keymap.set
 local cmd = vim.cmd
@@ -58,12 +63,12 @@ require("lazy").setup({
     "kdheepak/lazygit.nvim",
     -- Navigation
     "stevearc/aerial.nvim",
+    "nvim-tree/nvim-tree.lua",
     -- Editing
     "windwp/nvim-autopairs",
     "windwp/nvim-ts-autotag",
     "numToStr/Comment.nvim",
     "kylechui/nvim-surround",
-    "kristijanhusak/vim-dadbod-ui",
     -- Language specific
     {
         "ray-x/go.nvim",
@@ -71,7 +76,10 @@ require("lazy").setup({
         build=':lua require("go.install).update_all_sync()',
         ft = {"go", "gomod"}
     },
-    "mrcjkb/rustaceanvim"
+    "mrcjkb/rustaceanvim",
+    -- Databases
+    "tpope/vim-dadbod",
+    "kristijanhusak/vim-dadbod-ui"
 })
 
 -- Essential key mappings
@@ -141,6 +149,7 @@ set.sidescrolloff = 15
 set.sidescroll = 1
 
 -- Color
+vim.opt.termguicolors = true
 set.background = "dark"
 require("tokyonight").setup({
     styles = {
@@ -229,7 +238,15 @@ require("mason-lspconfig").setup({
 local lspconfig = require("lspconfig")
 lspconfig.cssls.setup({})
 lspconfig.quick_lint_js.setup({})
-lspconfig.tsserver.setup({})
+
+lspconfig.tsserver.setup({
+    filetypes = {
+        'typescript',
+        'typescriptreact',
+        'typescript.tsx'
+    }
+})
+
 lspconfig.pyright.setup({})
 lspconfig.r_language_server.setup({})
 lspconfig.sqlls.setup({})
@@ -347,6 +364,7 @@ require("nvim-ts-autotag").setup({})
 require('Comment').setup({})
 require("nvim-surround").setup({})
 
--- Language specific
+-- Tree sidebar files
 
--- require("go").setup({});
+require("nvim-tree").setup()
+map('n', '<leader>rr', '<cmd>NvimTreeToggle<CR>')
