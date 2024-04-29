@@ -77,6 +77,7 @@ require("lazy").setup({
         ft = {"go", "gomod"}
     },
     "mrcjkb/rustaceanvim",
+    "jalvesaq/Nvim-R",
     -- Databases
     "tpope/vim-dadbod",
     "kristijanhusak/vim-dadbod-ui"
@@ -96,8 +97,8 @@ map('n', '<C-j>', '<C-w>j', { silent = true })
 map('n', '<C-k>', '<C-w>k', { silent = true })
 map('n', '<C-l>', '<C-w>l', { silent = true })
 map('n', '<leader>tt', ':tabnew<Cr>', { silent = true })
-map('n', '<leader>tl', ':tabnext<Cr>', { silent = true })
-map('n', '<leader>th', ':tabprev<Cr>', { silent = true })
+map('n', '<leader>tk', ':tabnext<Cr>', { silent = true })
+map('n', '<leader>tj', ':tabprev<Cr>', { silent = true })
 map('n', '<leader>uu', ':Lazy update<Cr>', { silent = true })
 
 
@@ -368,3 +369,9 @@ require("nvim-surround").setup({})
 
 require("nvim-tree").setup()
 map('n', '<leader>rr', '<cmd>NvimTreeToggle<CR>')
+
+-- R specific
+vim.g.R_hl_term = 1
+vim.g.R_rconsole_width = 120
+
+map('t', '<C-k>', '<C-\\><C-n>')
