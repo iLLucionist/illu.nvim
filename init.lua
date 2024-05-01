@@ -254,7 +254,7 @@ lspconfig.sqlls.setup({})
 lspconfig.html.setup({})
 lspconfig.marksman.setup({})
 lspconfig.yamlls.setup({})
-lspconfig.svelte.setup({})
+-- lspconfig.svelte.setup({})
 lspconfig.gopls.setup({})
 
 map('n', '<space>e', vim.diagnostic.open_float)
