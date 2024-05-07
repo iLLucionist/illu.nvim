@@ -80,7 +80,9 @@ require("lazy").setup({
     "jalvesaq/Nvim-R",
     -- Databases
     "tpope/vim-dadbod",
-    "kristijanhusak/vim-dadbod-ui"
+    "kristijanhusak/vim-dadbod-ui",
+    -- Toggle diagnostics
+    "WhoIsSethDaniel/toggle-lsp-diagnostics.nvim"
 })
 
 -- Essential key mappings
@@ -254,7 +256,7 @@ lspconfig.sqlls.setup({})
 lspconfig.html.setup({})
 lspconfig.marksman.setup({})
 lspconfig.yamlls.setup({})
--- lspconfig.svelte.setup({})
+lspconfig.svelte.setup({})
 lspconfig.gopls.setup({})
 
 map('n', '<space>e', vim.diagnostic.open_float)
@@ -360,10 +362,10 @@ map('n', '<leader>aa', '<cmd>AerialToggle!<CR>')
 -- Editing
 
 require("yaml_nvim")
-require("nvim-autopairs").setup({})
-require("nvim-ts-autotag").setup({})
-require('Comment').setup({})
-require("nvim-surround").setup({})
+require("nvim-autopairs").setup()
+require("nvim-ts-autotag").setup()
+require('Comment').setup()
+require("nvim-surround").setup()
 
 -- Tree sidebar files
 
@@ -375,3 +377,9 @@ vim.g.R_hl_term = 1
 vim.g.R_rconsole_width = 120
 
 map('t', '<C-k>', '<C-\\><C-n>')
+map('t', 'jk', '<C-\\><C-n>')
+map('t', 'kj', '<C-\\><C-n>')
+
+-- Toggle diagnostics
+require('toggle_lsp_diagnostics').init()
+map('n', '<Space>dd', ":ToggleDiag<CR>")
