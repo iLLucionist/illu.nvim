@@ -375,6 +375,7 @@ map('n', '<leader>rr', '<cmd>NvimTreeToggle<CR>')
 -- R specific
 vim.g.R_hl_term = 1
 vim.g.R_rconsole_width = 120
+vim.g.R_assign = 0
 
 map('t', '<C-k>', '<C-\\><C-n>')
 map('t', 'jk', '<C-\\><C-n>')
