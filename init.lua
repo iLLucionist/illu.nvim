@@ -32,6 +32,7 @@ require("lazy").setup({
     -- Colorscheme
     "ellisonleao/gruvbox.nvim",
     "folke/tokyonight.nvim",
+    "Mofiqul/vscode.nvim",
     -- Statusline / Tabline
     "nvim-lualine/lualine.nvim",
     "nvim-tree/nvim-web-devicons",
@@ -153,14 +154,25 @@ set.sidescroll = 1
 
 -- Color
 vim.opt.termguicolors = true
-set.background = "dark"
+vim.opt.guicursor = ""
+set.background = "light"
+
 require("tokyonight").setup({
+    terminal_colors = true,
     styles = {
         -- comments = { fg = "#6e7596" }
-        comments = { fg = "#7b83a6" }
-    }
+        comments = { fg = "#7b83a6" },
+    },
+    day_brightness = 0.2  
+
+
 })
-cmd("colorscheme tokyonight-night")
+
+require("vscode").setup({})
+
+-- cmd("colorscheme tokyonight-night")
+-- cmd("colorscheme tokyonight-day")
+cmd("colorscheme vscode")
 
 -- Statusline
 require("lualine").setup()
