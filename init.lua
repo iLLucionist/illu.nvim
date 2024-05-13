@@ -153,6 +153,8 @@ set.sidescrolloff = 15
 set.sidescroll = 1
 
 -- Color
+--
+vim.g.illuColor = 'light'
 vim.opt.termguicolors = true
 vim.opt.guicursor = ""
 set.background = "light"
@@ -168,11 +170,27 @@ require("tokyonight").setup({
 
 })
 
+
+
 require("vscode").setup({})
 
 -- cmd("colorscheme tokyonight-night")
 -- cmd("colorscheme tokyonight-day")
 cmd("colorscheme vscode")
+
+function ToggleColor()
+    if vim.g.illuColor == 'light' then
+        vim.g.illuColor = 'dark'
+        set.background = "dark"
+        cmd("colorscheme tokyonight-night")
+    else
+        vim.g.illuColor = 'light'
+        set.background = "light"
+        cmd("colorscheme vscode")
+    end
+end
+
+map('n', '<leader>cc', '<cmd>lua ToggleColor()<CR>', {})
 
 -- Statusline
 require("lualine").setup()
