@@ -83,7 +83,10 @@ require("lazy").setup({
     "tpope/vim-dadbod",
     "kristijanhusak/vim-dadbod-ui",
     -- Toggle diagnostics
-    "WhoIsSethDaniel/toggle-lsp-diagnostics.nvim"
+    "WhoIsSethDaniel/toggle-lsp-diagnostics.nvim",
+    -- REPL
+    "hkupty/iron.nvim",
+    "nyngwang/NeoZoom.lua"
 })
 
 -- Essential key mappings
@@ -152,12 +155,16 @@ set.scrolloff = 8
 set.sidescrolloff = 15
 set.sidescroll = 1
 
+-- Relative line numbers
+vim.wo.relativenumber = true
+
 -- Color
 --
-vim.g.illuColor = 'light'
+vim.g.illuColor = 'dark'
 vim.opt.termguicolors = true
-vim.opt.guicursor = ""
-set.background = "light"
+
+-- vim.opt.guicursor = ""
+set.background = "dark"
 
 require("tokyonight").setup({
     terminal_colors = true,
@@ -165,18 +172,20 @@ require("tokyonight").setup({
         -- comments = { fg = "#6e7596" }
         comments = { fg = "#7b83a6" },
     },
-    day_brightness = 0.2  
-
-
+    day_brightness = 0.2,
+    on_colors = function(colors)
+        colors.fg_gutter = colors.dark3
+    end
 })
-
-
 
 require("vscode").setup({})
 
+
+
+
 -- cmd("colorscheme tokyonight-night")
 -- cmd("colorscheme tokyonight-day")
-cmd("colorscheme vscode")
+cmd("colorscheme tokyonight-storm")
 
 function ToggleColor()
     if vim.g.illuColor == 'light' then
@@ -370,6 +379,9 @@ require("nvim-treesitter.configs").setup({
     },
     sql = {
         enable = true
+    },
+    python = {
+        enable = true
     }
 })
 
@@ -400,7 +412,7 @@ require("nvim-surround").setup()
 -- Tree sidebar files
 
 require("nvim-tree").setup()
-map('n', '<leader>rr', '<cmd>NvimTreeToggle<CR>')
+map('n', '<leader>ss', '<cmd>NvimTreeToggle<CR>')
 
 -- R specific
 vim.g.R_hl_term = 1
@@ -414,3 +426,72 @@ map('t', 'kj', '<C-\\><C-n>')
 -- Toggle diagnostics
 require('toggle_lsp_diagnostics').init()
 map('n', '<Space>dd', ":ToggleDiag<CR>")
+
+-- REPL
+local iron = require("iron.core")
+
+iron.setup {
+    config = {
+        -- Whether a repl should be discarded or not
+        scratch_repl = true,
+        -- Your repl definitions come here
+        repl_definition = {
+            python = {
+                command = { "ipython" }
+            },
+            sh = {
+                -- Can be a table or a function that
+                -- returns a table (see below)
+                command = {"zsh"}
+            }
+        },
+        -- How the repl window will be displayed
+        -- See below for more information
+        -- repl_open_cmd = require('iron.view').right(80),
+        repl_open_cmd = "vertical 80 split"
+    },
+    -- Iron doesn't set keymaps by default anymore.
+    -- You can set them here or manually add keymaps to the functions in iron.core
+    keymaps = {
+        send_motion = "<space>rr",
+        visual_send = "<space>rr",
+        send_file = "<space>rf",
+        send_line = "<space>rl",
+        -- send_paragraph = "<space>sp",
+        send_until_cursor = "<space>su",
+        send_mark = "<space>rsm",
+        mark_motion = "<space>rmc",
+        mark_visual = "<space>rmc",
+        remove_mark = "<space>rmk",
+        cr = "<space>rr<cr>",
+        interrupt = "<space>r<space>",
+        exit = "<space>rq",
+        clear = "<space>rx",
+    },
+    -- If the highlight is on, you can change how it looks
+    -- For the available options, check nvim_set_hl
+    highlight = {
+        italic = false
+    },
+    ignore_blank_lines = true, -- ignore blank lines when sending visual select lines
+}
+
+-- iron also has a list of commands, see :h iron-commands for all available commands
+vim.keymap.set('n', '<space>rs', '<cmd>IronRepl<cr>')
+vim.keymap.set('n', '<space>rr', '<cmd>IronRestart<cr>')
+vim.keymap.set('n', '<space>rf', '<cmd>IronFocus<cr>')
+vim.keymap.set('n', '<space>rh', '<cmd>IronHide<cr>')
+
+require("neo-zoom").setup({
+    popup = { enabled = false },
+    winopts = {
+        offset = {
+            top = nil,
+            left = nil,
+            width = 1,
+            height = 1
+        }
+    }
+})
+
+vim.keymap.set('n', '<space>zz', '<cmd>NeoZoomToggle<cr>')
