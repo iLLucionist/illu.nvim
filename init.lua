@@ -185,7 +185,7 @@ require("vscode").setup({})
 
 -- cmd("colorscheme tokyonight-night")
 -- cmd("colorscheme tokyonight-day")
-cmd("colorscheme tokyonight-storm")
+cmd("colorscheme tokyonight-night")
 
 function ToggleColor()
     if vim.g.illuColor == 'light' then
