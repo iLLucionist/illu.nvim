@@ -106,6 +106,12 @@ map('n', '<leader>tt', ':tabnew<Cr>', { silent = true })
 map('n', '<leader>tk', ':tabnext<Cr>', { silent = true })
 map('n', '<leader>tj', ':tabprev<Cr>', { silent = true })
 map('n', '<leader>uu', ':Lazy update<Cr>', { silent = true })
+-- Move line up / down
+map('n', '<leader>k', 'ddkP', { silent = true })
+map('n', '<leader>j', 'ddp', { silent = true })
+-- Add blank line above / below
+map('n', '<leader>O', 'O<Esc>', { silent = true })
+map('n', '<leader>o', 'o<Esc>', { silent = true })
 
 
 -- Sane defaults
