@@ -184,7 +184,6 @@ require("tokyonight").setup({
     end
 })
 
-require("vscode").setup({})
 
 
 
@@ -198,10 +197,13 @@ function ToggleColor()
         vim.g.illuColor = 'dark'
         set.background = "dark"
         cmd("colorscheme tokyonight-night")
+        cmd("mode")
     else
         vim.g.illuColor = 'light'
         set.background = "light"
+        require("vscode").setup({})
         cmd("colorscheme vscode")
+        cmd("mode")
     end
 end
 
@@ -301,7 +303,17 @@ lspconfig.sqlls.setup({})
 lspconfig.html.setup({})
 lspconfig.marksman.setup({})
 lspconfig.yamlls.setup({})
-lspconfig.svelte.setup({})
+lspconfig.svelte.setup({
+    on_attach = function(client, bufnr)
+        vim.api.nvim_create_autocmd("BufWritePost", {
+            pattern = { "*.js", "*.ts" },
+            callback = function(ctx)
+                -- Here use ctx.match instead of ctx.file
+                client.notify("$/onDidChangeTsOrJsFile", { uri = ctx.match })
+            end,
+        })
+    end,
+})
 lspconfig.gopls.setup({})
 
 map('n', '<space>e', vim.diagnostic.open_float)
