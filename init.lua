@@ -54,6 +54,11 @@ require("lazy").setup({
     "nvim-lua/plenary.nvim",
     "nvim-telescope/telescope.nvim",
     "nvim-telescope/telescope-file-browser.nvim",
+    -- harpoon is just buggy atm, disabled
+    -- {
+    --     "ThePrimeagen/harpoon",
+    --     branch = "harpoon2"
+    -- },
     -- Completion
     "hrsh7th/cmp-nvim-lsp",
     "hrsh7th/cmp-buffer",
@@ -165,13 +170,10 @@ set.sidescroll = 1
 vim.wo.relativenumber = true
 
 -- Color
---
 vim.g.illuColor = 'dark'
 vim.opt.termguicolors = true
 
 -- vim.opt.guicursor = ""
-set.background = "dark"
-
 require("tokyonight").setup({
     terminal_colors = true,
     styles = {
@@ -183,9 +185,6 @@ require("tokyonight").setup({
         colors.fg_gutter = colors.dark3
     end
 })
-
-
-
 
 
 -- cmd("colorscheme tokyonight-night")
@@ -380,9 +379,6 @@ require("nvim-treesitter.configs").setup({
         enable = true,
         extended_mode = true
     },
-    autotag = {
-        enable = true
-    },
     yaml = {
         enable = true
     },
@@ -513,3 +509,20 @@ require("neo-zoom").setup({
 })
 
 vim.keymap.set('n', '<space>zz', '<cmd>NeoZoomToggle<cr>')
+
+-- Harpoon
+-- local harpoon = require('harpoon');
+-- harpoon:setup()
+
+-- vim.keymap.set("n", "<leader>a", function() harpoon:list():add() end)
+-- vim.keymap.set("n", "<leader>r", function() harpoon:list():remove() end)
+-- vim.keymap.set("n", "<leader>l", function() harpoon.ui:toggle_quick_menu(harpoon:list()) end)
+--
+-- vim.keymap.set("n", "<leader>h1", function() harpoon:list():select(1) end)
+-- vim.keymap.set("n", "<leader>h2", function() harpoon:list():select(2) end)
+-- vim.keymap.set("n", "<leader>h3", function() harpoon:list():select(3) end)
+-- vim.keymap.set("n", "<leader>h4", function() harpoon:list():select(4) end)
+--
+-- -- Toggle previous & next buffers stored within Harpoon list
+-- vim.keymap.set("n", "<leader>hj", function() harpoon:list():prev() end)
+-- vim.keymap.set("n", "<leader>hk", function() harpoon:list():next() end)
