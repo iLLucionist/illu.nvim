@@ -284,11 +284,26 @@ require("mason-lspconfig").setup({
     ensure_installed = { "cssls", "quick_lint_js", "tsserver", "pyright", "r_language_server", "sqlls", "yamlls", "html", "marksman", "volar", "svelte", "gopls" }
 })
 
+-- Workaround for tsserver --> ts_ls rename
+-- https://github.com/neovim/nvim-lspconfig/pull/3232#issuecomment-2331025714
+require("mason-lspconfig").setup_handlers({
+    function(server_name)
+        if server_name == "tsserver" then
+            server_name = "ts_ls"
+        end
+        local capabilities = require("cmp_nvim_lsp").default_capabilities()
+        require("lspconfig")[server_name].setup({
+            capabilities = capabilities,
+        })
+    end,
+})
+
 local lspconfig = require("lspconfig")
+
 lspconfig.cssls.setup({})
 lspconfig.quick_lint_js.setup({})
 
-lspconfig.tsserver.setup({
+lspconfig.ts_ls.setup({
     filetypes = {
         'typescript',
         'typescriptreact',
