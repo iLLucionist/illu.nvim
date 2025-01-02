@@ -64,7 +64,10 @@ require("lazy").setup({
     "hrsh7th/cmp-buffer",
     "hrsh7th/cmp-path",
     "hrsh7th/cmp-cmdline",
-    "hrsh7th/nvim-cmp",
+    {
+        "hrsh7th/nvim-cmp",
+        commit = "b356f2c"
+    },
     -- git
     "kdheepak/lazygit.nvim",
     -- Navigation
@@ -76,13 +79,18 @@ require("lazy").setup({
     "numToStr/Comment.nvim",
     "kylechui/nvim-surround",
     -- Language specific
+    "rafaelsq/nvim-goc.lua",
     {
         "ray-x/go.nvim",
         -- install required binaries
         build=':lua require("go.install).update_all_sync()',
         ft = {"go", "gomod"}
     },
-    "mrcjkb/rustaceanvim",
+    {
+        "mrcjkb/rustaceanvim",
+        version = "^5",
+        lazy = false,
+    },
     "jalvesaq/Nvim-R",
     -- Databases
     "tpope/vim-dadbod",
@@ -280,23 +288,24 @@ cmp.setup({
 -- LSP
 require("mason").setup()
 
-require("mason-lspconfig").setup({
-    ensure_installed = { "cssls", "quick_lint_js", "tsserver", "pyright", "r_language_server", "sqlls", "yamlls", "html", "marksman", "volar", "svelte", "gopls" }
-})
-
 -- Workaround for tsserver --> ts_ls rename
 -- https://github.com/neovim/nvim-lspconfig/pull/3232#issuecomment-2331025714
-require("mason-lspconfig").setup_handlers({
-    function(server_name)
-        if server_name == "tsserver" then
-            server_name = "ts_ls"
-        end
-        local capabilities = require("cmp_nvim_lsp").default_capabilities()
-        require("lspconfig")[server_name].setup({
-            capabilities = capabilities,
-        })
-    end,
+-- require("mason-lspconfig").setup_handlers({
+--     function(server_name)
+--         if server_name == "tsserver" then
+--             server_name = "ts_ls"
+--         end
+--         local capabilities = require("cmp_nvim_lsp").default_capabilities()
+--         require("lspconfig")[server_name].setup({
+--             capabilities = capabilities,
+--         })
+--     end,
+-- })
+
+require("mason-lspconfig").setup({
+    ensure_installed = { "cssls", "quick_lint_js", "ts_ls", "pyright", "r_language_server", "sqlls", "yamlls", "html", "marksman", "volar", "svelte", "gopls" }
 })
+
 
 local lspconfig = require("lspconfig")
 
@@ -415,8 +424,8 @@ require("nvim-treesitter.configs").setup({
 })
 
 -- git
-map('n', '<Space>gg', ":LazyGit<CR>")
-map('n', '<Space>gc', ":LazyGitConfig<CR>")
+map('n', '<Space>ggg', ":LazyGit<CR>")
+map('n', '<Space>ggc', ":LazyGitConfig<CR>")
 
 -- Code Navigation
 require("aerial").setup({
@@ -541,3 +550,11 @@ vim.keymap.set('n', '<space>zz', '<cmd>NeoZoomToggle<cr>')
 -- -- Toggle previous & next buffers stored within Harpoon list
 -- vim.keymap.set("n", "<leader>hj", function() harpoon:list():prev() end)
 -- vim.keymap.set("n", "<leader>hk", function() harpoon:list():next() end)
+
+-- Go
+local goc = require("nvim-goc")
+goc.setup({ verticalSplit = false })
+
+map('n', '<Leader>gcf', goc.Coverage, {silent=true})
+map('n', '<Leader>gct', goc.CoverageFunc, {silent=true})
+map('n', '<Leader>gcc', goc.ClearCoverage, {silent=true})
