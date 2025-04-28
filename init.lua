@@ -595,12 +595,6 @@ vim.api.nvim_create_user_command("ReorderScript", function()
     require("svelte_script_sorter").reorder_script_block(0)
 end, {})
 
-require("svelte_tree")
-
-vim.api.nvim_create_user_command("SvelteTree", function()
-    require("svelte_tree").svelte_hierarchy()
-end, {})
-
 require("tailwind-tools").setup({})
 
 
