@@ -205,7 +205,7 @@ vim.opt.termguicolors = true
 -- cmd("colorscheme tokyonight-day")
 -- cmd("colorscheme tokyonight-night")
 -- xs
-cmd("colorscheme tokyonight-moon")
+cmd("colorscheme tokyonight-night")
 
 
 
