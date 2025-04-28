@@ -33,6 +33,8 @@ require("lazy").setup({
     "ellisonleao/gruvbox.nvim",
     "folke/tokyonight.nvim",
     "Mofiqul/vscode.nvim",
+    "projekt0n/github-nvim-theme",
+    { "catppuccin/nvim", name="catppuccin"},
     -- Statusline / Tabline
     "nvim-lualine/lualine.nvim",
     "nvim-tree/nvim-web-devicons",
@@ -50,10 +52,12 @@ require("lazy").setup({
     { "nvim-treesitter/nvim-treesitter", opts = {
         highlight = { enable = true }
     }, cmd = "TSUpdate" },
+    "nvim-treesitter/nvim-treesitter-textobjects",
     -- Fuzzy finding
     "nvim-lua/plenary.nvim",
     "nvim-telescope/telescope.nvim",
     "nvim-telescope/telescope-file-browser.nvim",
+    "nvim-telescope/telescope-project.nvim",
     -- harpoon is just buggy atm, disabled
     -- {
     --     "ThePrimeagen/harpoon",
@@ -99,7 +103,9 @@ require("lazy").setup({
     "WhoIsSethDaniel/toggle-lsp-diagnostics.nvim",
     -- REPL
     "hkupty/iron.nvim",
-    "nyngwang/NeoZoom.lua"
+    "nyngwang/NeoZoom.lua",
+    -- TAILWIND
+    "luckasRanarison/tailwind-tools.nvim"
 })
 
 -- Essential key mappings
@@ -178,38 +184,41 @@ set.sidescroll = 1
 vim.wo.relativenumber = true
 
 -- Color
-vim.g.illuColor = 'dark'
+vim.g.illuColor = 'light'
 vim.opt.termguicolors = true
 
 -- vim.opt.guicursor = ""
-require("tokyonight").setup({
-    terminal_colors = true,
-    styles = {
-        -- comments = { fg = "#6e7596" }
-        comments = { fg = "#7b83a6" },
-    },
-    day_brightness = 0.2,
-    on_colors = function(colors)
-        colors.fg_gutter = colors.dark3
-    end
-})
+-- require("tokyonight").setup({
+--     terminal_colors = true,
+--     styles = {
+--         -- comments = { fg = "#6e7596" }
+--         comments = { fg = "#7b83a6" },
+--     },
+--     day_brightness = 0.2,
+--     on_colors = function(colors)
+--         colors.fg_gutter = colors.dark3
+--     end
+-- })
 
 
--- cmd("colorscheme tokyonight-night")
+-- cmd("/colorscheme tokyonight-night")
 -- cmd("colorscheme tokyonight-day")
-cmd("colorscheme tokyonight-night")
+-- cmd("colorscheme tokyonight-night")
+-- xs
+cmd("colorscheme tokyonight-moon")
+
+
 
 function ToggleColor()
     if vim.g.illuColor == 'light' then
         vim.g.illuColor = 'dark'
         set.background = "dark"
-        cmd("colorscheme tokyonight-night")
+        cmd("colorscheme github_dark")
         cmd("mode")
     else
         vim.g.illuColor = 'light'
         set.background = "light"
-        require("vscode").setup({})
-        cmd("colorscheme vscode")
+        cmd("colorscheme github_light")
         cmd("mode")
     end
 end
@@ -219,15 +228,14 @@ map('n', '<leader>cc', '<cmd>lua ToggleColor()<CR>', {})
 -- Statusline
 require("lualine").setup()
 
--- Tabline
-
 
 -- Fuzzy finding
 local builtin = require('telescope.builtin')
 map('n', '<leader>ff', builtin.find_files, {})
 map('n', '<leader>fg', builtin.live_grep, {})
-map('n', '<leader>fr', builtin.buffers, {})
+map('n', '<leader>fd', builtin.buffers, {})
 map('n', '<leader>fh', builtin.help_tags, {})
+map('n', '<leader>fp', function() require'telescope'.extensions.project.project{} end, {})
 
 local fb_actions = require("telescope").extensions.file_browser.actions
 
@@ -336,6 +344,14 @@ lspconfig.svelte.setup({
             end,
         })
     end,
+    handlers = {
+        ["textDocument/definition"] = function(err, result, ctx, config)
+            if type(result) == "table" then
+                result = { result[1] }
+            end
+            vim.lsp.handlers["textDocument/definition"](err, result, ctx, config)
+        end,
+    },
 })
 lspconfig.gopls.setup({})
 
@@ -420,7 +436,23 @@ require("nvim-treesitter.configs").setup({
     },
     python = {
         enable = true
+    },
+
+    textobjects = {
+        move = {
+            enable = true,
+            set_jumps = true,
+            goto_next_start = {
+                ["]a"] = "@attribute.outer",
+                ["]t"] = "@function.outer",
+            },
+            goto_previous_start = {
+                ["[a"] = "@attribute.outer",
+                ["[t"] = "@function.outer",
+            },
+        }
     }
+
 })
 
 -- git
@@ -522,7 +554,7 @@ vim.keymap.set('n', '<space>rh', '<cmd>IronHide<cr>')
 
 require("neo-zoom").setup({
     popup = { enabled = false },
-    winopts = {
+winopts = {
         offset = {
             top = nil,
             left = nil,
@@ -558,3 +590,83 @@ goc.setup({ verticalSplit = false })
 map('n', '<Leader>gcf', goc.Coverage, {silent=true})
 map('n', '<Leader>gct', goc.CoverageFunc, {silent=true})
 map('n', '<Leader>gcc', goc.ClearCoverage, {silent=true})
+
+vim.api.nvim_create_user_command("ReorderScript", function()
+    require("svelte_script_sorter").reorder_script_block(0)
+end, {})
+
+require("svelte_tree")
+
+vim.api.nvim_create_user_command("SvelteTree", function()
+    require("svelte_tree").svelte_hierarchy()
+end, {})
+
+require("tailwind-tools").setup({})
+
+
+-- SVELTE
+
+local function is_line_inside_script(bufnr, line)
+  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+  local inside_script = false
+
+  for i, content in ipairs(lines) do
+    if content:find("<script") then
+      inside_script = true
+    end
+    if content:find("</script>") then
+      if i >= line + 1 then
+        return inside_script
+      end
+      inside_script = false
+    end
+    if i == line + 1 then
+      return inside_script
+    end
+  end
+
+  return false
+end
+
+local function delete_lines_with_error_code(error_code)
+  local bufnr = vim.api.nvim_get_current_buf()
+  local diagnostics = vim.diagnostic.get(bufnr)
+  local lines_to_delete = {}
+
+  -- Detect filetype (to special-handle Svelte files)
+  local filetype = vim.bo.filetype
+
+  -- Collect line numbers matching the error code
+  for _, diagnostic in ipairs(diagnostics) do
+    if diagnostic.code == error_code then
+      local should_delete = true
+
+      -- Special logic for Svelte
+      if filetype == "svelte" then
+        should_delete = is_line_inside_script(bufnr, diagnostic.lnum)
+      end
+
+      if should_delete then
+        table.insert(lines_to_delete, diagnostic.lnum)
+      end
+    end
+  end
+
+  -- Sort descending to avoid messing up line numbers when deleting
+  table.sort(lines_to_delete, function(a, b) return a > b end)
+
+  -- Delete lines
+  for _, lnum in ipairs(lines_to_delete) do
+    vim.api.nvim_buf_set_lines(bufnr, lnum, lnum + 1, false, {})
+  end
+end
+
+-- Create a Vim command :DeleteUnusedVars
+vim.api.nvim_create_user_command('DeleteUnusedVars', function()
+  delete_lines_with_error_code(6133)
+end, {})
+
+-- OPTIONAL: Keymap (e.g., <leader>du to "Delete Unused")
+vim.keymap.set('n', '<leader>du', function()
+  delete_lines_with_error_code(6133)
+end, { desc = "Delete unused variables (TS Error 6133)" })
