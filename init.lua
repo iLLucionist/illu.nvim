@@ -53,6 +53,8 @@ require("lazy").setup({
         highlight = { enable = true }
     }, cmd = "TSUpdate" },
     "nvim-treesitter/nvim-treesitter-textobjects",
+    -- Motion
+    "ggandor/leap.nvim",
     -- Fuzzy finding
     "nvim-lua/plenary.nvim",
     "nvim-telescope/telescope.nvim",
@@ -213,7 +215,7 @@ function ToggleColor()
     if vim.g.illuColor == 'light' then
         vim.g.illuColor = 'dark'
         set.background = "dark"
-        cmd("colorscheme github_dark")
+        cmd("colorscheme tokyonight-night")
         cmd("mode")
     else
         vim.g.illuColor = 'light'
@@ -664,3 +666,6 @@ end, {})
 vim.keymap.set('n', '<leader>du', function()
   delete_lines_with_error_code(6133)
 end, { desc = "Delete unused variables (TS Error 6133)" })
+
+-- LEAP
+require('leap').set_default_mappings()
