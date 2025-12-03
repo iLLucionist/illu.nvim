@@ -97,7 +97,7 @@ require("lazy").setup({
         version = "^5",
         lazy = false,
     },
-    "jalvesaq/Nvim-R",
+    "R-nvim/R.nvim",
     -- Databases
     "tpope/vim-dadbod",
     "kristijanhusak/vim-dadbod-ui",
@@ -313,7 +313,7 @@ require("mason").setup()
 -- })
 
 require("mason-lspconfig").setup({
-    ensure_installed = { "cssls", "quick_lint_js", "ts_ls", "pyright", "r_language_server", "sqlls", "yamlls", "html", "marksman", "volar", "svelte", "gopls" }
+    ensure_installed = { "cssls", "quick_lint_js", "ts_ls", "pyright", "r_language_server", "sqlls", "yamlls", "html", "marksman", "svelte", "gopls" }
 })
 
 
@@ -411,7 +411,7 @@ map('n', '<leader>gR', '<cmd>TroubleToggle lsp_references<cr>')
 
 -- Treesitter
 require("nvim-treesitter.configs").setup({
-    ensure_installed = { "lua", "vim", "vimdoc", "css", "json", "javascript", "latex", "python", "r", "regex", "scss", "yaml", "html", "css", "vue", "svelte", "go", "typescript", "sql" },
+    ensure_installed = { "lua", "vim", "vimdoc", "css", "json", "javascript", "latex", "python", "r", "regex", "scss", "yaml", "html", "css", "vue", "svelte", "go", "typescript", "sql","markdown", "rnoweb" },
     highlight = {
         enable = true,
         additional_vim_regex_highlighting = true
