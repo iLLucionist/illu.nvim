@@ -133,6 +133,9 @@ map('n', '<leader>j', 'ddp', { silent = true })
 -- Add blank line above / below
 map('n', '<leader>O', 'O<Esc>', { silent = true })
 map('n', '<leader>o', 'o<Esc>', { silent = true })
+-- Open terminal
+map('n', '<leader>ot', ':vsplit | terminal<CR>', { silent = true })
+map('n', '<leader>ht', ':split | terminal<CR>', { silent = true })
 
 
 -- Sane defaults
@@ -313,30 +316,49 @@ require("mason").setup()
 -- })
 
 require("mason-lspconfig").setup({
-    ensure_installed = { "cssls", "quick_lint_js", "ts_ls", "pyright", "r_language_server", "sqlls", "yamlls", "html", "marksman", "svelte", "gopls" }
+    ensure_installed = { "cssls", "quick_lint_js", "ts_ls", "pyright", "r_language_server", "sqlls", "yamlls", "html", "marksman", "svelte", "gopls", "tailwindcss" }
 })
 
 
-local lspconfig = require("lspconfig")
+-- CHANGED: Removed deprecated `local lspconfig = require("lspconfig")` pattern
+-- The old pattern was: lspconfig.SERVER.setup({})
+-- New pattern uses vim.lsp.config() to customize, then vim.lsp.enable() to activate
+-- This is the Neovim 0.11+ recommended approach that replaces nvim-lspconfig's framework
 
-lspconfig.cssls.setup({})
-lspconfig.quick_lint_js.setup({})
+-- Basic servers with default configuration
+-- CHANGED: Using vim.lsp.enable() instead of lspconfig.SERVER.setup({})
+-- These servers use nvim-lspconfig's default configs (from the lsp/ directory)
+-- which are automatically discovered by vim.lsp.enable()
+vim.lsp.enable('cssls')
+vim.lsp.enable('quick_lint_js')
+vim.lsp.enable('pyright')
+vim.lsp.enable('r_language_server')
+vim.lsp.enable('sqlls')
+vim.lsp.enable('html')
+vim.lsp.enable('marksman')
+vim.lsp.enable('yamlls')
+vim.lsp.enable('gopls')
 
-lspconfig.ts_ls.setup({
+-- CHANGED: Added Tailwind CSS LSP support
+-- Tailwind LSP provides IntelliSense, linting, and hover documentation for Tailwind classes
+vim.lsp.enable('tailwindcss')
+
+-- TypeScript server with custom filetypes
+-- CHANGED: Using vim.lsp.config() to customize before enabling
+-- First configure the server, then enable it
+vim.lsp.config('ts_ls', {
     filetypes = {
         'typescript',
         'typescriptreact',
         'typescript.tsx'
     }
 })
+vim.lsp.enable('ts_ls')
 
-lspconfig.pyright.setup({})
-lspconfig.r_language_server.setup({})
-lspconfig.sqlls.setup({})
-lspconfig.html.setup({})
-lspconfig.marksman.setup({})
-lspconfig.yamlls.setup({})
-lspconfig.svelte.setup({
+-- Svelte server with custom on_attach and handlers
+-- CHANGED: Using vim.lsp.config() for complex customization
+-- on_attach and handlers work the same way, just configured differently
+vim.lsp.config('svelte', {
     on_attach = function(client, bufnr)
         vim.api.nvim_create_autocmd("BufWritePost", {
             pattern = { "*.js", "*.ts" },
@@ -355,7 +377,7 @@ lspconfig.svelte.setup({
         end,
     },
 })
-lspconfig.gopls.setup({})
+vim.lsp.enable('svelte')
 
 map('n', '<space>e', vim.diagnostic.open_float)
 map('n', '[d', vim.diagnostic.goto_prev)
@@ -557,13 +579,13 @@ vim.keymap.set('n', '<space>rh', '<cmd>IronHide<cr>')
 require("neo-zoom").setup({
     popup = { enabled = false },
 winopts = {
-        offset = {
-            top = nil,
-            left = nil,
-            width = 1,
-            height = 1
-        }
+    offset = {
+        top = nil,
+        left = nil,
+        width = 1,
+        height = 1
     }
+}
 })
 
 vim.keymap.set('n', '<space>zz', '<cmd>NeoZoomToggle<cr>')
@@ -597,7 +619,10 @@ vim.api.nvim_create_user_command("ReorderScript", function()
     require("svelte_script_sorter").reorder_script_block(0)
 end, {})
 
-require("tailwind-tools").setup({})
+-- CHANGED: Commented out tailwind-tools.nvim because it internally uses deprecated require('lspconfig')
+-- This was causing the deprecation warning. Instead, using built-in Tailwind LSP above.
+-- If you need tailwind-tools features later, wait for the plugin to be updated for Neovim 0.11+
+-- require("tailwind-tools").setup({})
 
 
 -- SVELTE
@@ -668,4 +693,8 @@ vim.keymap.set('n', '<leader>du', function()
 end, { desc = "Delete unused variables (TS Error 6133)" })
 
 -- LEAP
-require('leap').set_default_mappings()
+-- CHANGED: Replaced deprecated add_default_mappings() with the new recommended approach
+-- The plugin now requires explicit keybindings using <Plug> mappings
+-- See :help leap-mappings for more details
+vim.keymap.set({'n', 'x', 'o'}, 's', '<Plug>(leap)')
+vim.keymap.set('n', 'S', '<Plug>(leap-from-window)')
