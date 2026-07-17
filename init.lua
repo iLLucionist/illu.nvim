@@ -334,6 +334,24 @@ map('n', '<leader>cc', '<cmd>lua ToggleColor()<CR>', {})
 -- Statusline
 require("lualine").setup()
 
+-- Bufferline
+require("barbar").setup({
+    exclude_name = { "Markdown Pane" },
+    icons = {
+        buffer_index = true,
+    },
+})
+
+map("n", "<S-h>", "<cmd>BufferPrevious<CR>", { silent = true })
+map("n", "<S-l>", "<cmd>BufferNext<CR>", { silent = true })
+map("n", "<leader>bp", "<cmd>BufferPick<CR>", { silent = true })
+
+for i = 1, 9 do
+    map("n", "<leader>" .. i, "<cmd>BufferGoto " .. i .. "<CR>", { silent = true })
+end
+
+map("n", "<leader>0", "<cmd>BufferLast<CR>", { silent = true })
+
 
 -- Fuzzy finding
 local builtin = require('telescope.builtin')
@@ -854,10 +872,79 @@ require("nvim-surround").setup()
 
 -- Tree sidebar files
 
+local function nvim_tree_file_target_picker()
+    local ok, markdown_pane = pcall(require, "markdown_pane")
+    local pane_winid = ok and markdown_pane.winid or nil
+    local pane_bufnr = ok and markdown_pane.bufnr or nil
+    local alternate_winid = vim.fn.win_getid(vim.fn.winnr("#"))
+    local candidates = {}
+
+    local function usable(winid)
+        if not vim.api.nvim_win_is_valid(winid) then
+            return false
+        end
+
+        if winid == pane_winid then
+            return false
+        end
+
+        local config = vim.api.nvim_win_get_config(winid)
+
+        if not config.focusable or config.hide or config.external then
+            return false
+        end
+
+        local bufnr = vim.api.nvim_win_get_buf(winid)
+
+        if bufnr == pane_bufnr then
+            return false
+        end
+
+        local buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr })
+        local filetype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
+
+        if vim.tbl_contains({ "nofile", "terminal", "help" }, buftype) then
+            return false
+        end
+
+        if vim.tbl_contains({ "NvimTree", "notify", "lazy", "qf", "diff", "fugitive", "fugitiveblame" }, filetype) then
+            return false
+        end
+
+        return true
+    end
+
+    if usable(alternate_winid) then
+        return alternate_winid
+    end
+
+    for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+        if usable(winid) then
+            table.insert(candidates, winid)
+        end
+    end
+
+    return candidates[1] or -1
+end
+
 require("nvim-tree").setup({
     actions = {
         open_file = {
             quit_on_open = true,
+            window_picker = {
+                picker = nvim_tree_file_target_picker,
+                exclude = {
+                    buftype = { "nofile", "terminal", "help" },
+                    filetype = {
+                        "notify",
+                        "lazy",
+                        "qf",
+                        "diff",
+                        "fugitive",
+                        "fugitiveblame",
+                    },
+                },
+            },
         },
     },
 })
