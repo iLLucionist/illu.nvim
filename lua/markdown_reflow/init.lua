@@ -1,4 +1,14 @@
-local M = {}
+local M = {
+    config = {
+        external_reflow_cmd = nil,
+        external_reflow_fallback = true,
+        external_reflow_protect_tables = true,
+    },
+}
+
+function M.setup(opts)
+    M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+end
 
 local function trim(text)
     local trimmed = text:gsub("^%s+", ""):gsub("%s+$", "")
@@ -32,12 +42,179 @@ local function target_width(opts)
     return 80
 end
 
-local function setext_underline(line)
-    return line:match("^%s*[=-]+%s*$") ~= nil
+local function external_protect_tables_enabled(opts)
+    if opts and opts.external_reflow_protect_tables ~= nil then
+        return opts.external_reflow_protect_tables
+    end
+
+    return M.config.external_reflow_protect_tables
 end
 
 local function fenced_delimiter(line)
     return line:match("^%s*(```+)") or line:match("^%s*(~~~+)")
+end
+
+local function table_line(line)
+    return line:match("^%s*|") or line:match("|%s*$")
+end
+
+local function mask_table_blocks(lines, opts)
+    if not external_protect_tables_enabled(opts) then
+        return lines, nil
+    end
+
+    local masked = {}
+    local blocks = {}
+    local in_fence = false
+    local i = 1
+
+    while i <= #lines do
+        local line = lines[i]
+
+        if fenced_delimiter(line) then
+            in_fence = not in_fence
+            table.insert(masked, line)
+            i = i + 1
+        elseif not in_fence and table_line(line) then
+            local block = {}
+
+            while i <= #lines and table_line(lines[i]) do
+                table.insert(block, lines[i])
+                i = i + 1
+            end
+
+            local token = "<!-- illu-nvim-reflow-table-" .. tostring(#blocks + 1) .. " -->"
+
+            table.insert(blocks, {
+                token = token,
+                lines = block,
+            })
+            table.insert(masked, token)
+        else
+            table.insert(masked, line)
+            i = i + 1
+        end
+    end
+
+    if #blocks == 0 then
+        return lines, nil
+    end
+
+    return masked, blocks
+end
+
+local function restore_table_blocks(lines, blocks)
+    if not blocks then
+        return lines
+    end
+
+    local by_token = {}
+
+    for _, block in ipairs(blocks) do
+        by_token[block.token] = block.lines
+    end
+
+    local restored = {}
+
+    for _, line in ipairs(lines) do
+        local token = line:match("^%s*(<!%-%- illu%-nvim%-reflow%-table%-%d+ %-%->)%s*$")
+        local block = token and by_token[token] or nil
+
+        if block then
+            vim.list_extend(restored, block)
+        else
+            table.insert(restored, line)
+        end
+    end
+
+    return restored
+end
+
+local function setext_underline(line)
+    return line:match("^%s*[=-]+%s*$") ~= nil
+end
+
+local function reflow_command(opts, width)
+    opts = opts or {}
+
+    local cmd = opts.external_reflow_cmd
+
+    if cmd == nil then
+        cmd = M.config.external_reflow_cmd
+    end
+
+    if type(cmd) == "function" then
+        cmd = cmd(width, opts)
+    end
+
+    if cmd == nil or cmd == false or cmd == "" then
+        return nil
+    end
+
+    local values = {
+        width = tostring(width),
+    }
+
+    local function expand(value)
+        if type(value) ~= "string" then
+            return value
+        end
+
+        return (value:gsub("{([%w_]+)}", function(key)
+            return values[key] or ""
+        end))
+    end
+
+    if type(cmd) == "table" then
+        local expanded = {}
+
+        for _, part in ipairs(cmd) do
+            table.insert(expanded, expand(part))
+        end
+
+        return expanded
+    end
+
+    if type(cmd) == "string" then
+        return expand(cmd)
+    end
+
+    return nil
+end
+
+local function external_fallback_enabled(opts)
+    if opts and opts.external_reflow_fallback ~= nil then
+        return opts.external_reflow_fallback
+    end
+
+    return M.config.external_reflow_fallback
+end
+
+local function run_external_reflow(lines, width, opts)
+    local cmd = reflow_command(opts, width)
+
+    if not cmd then
+        return nil
+    end
+
+    local masked, table_blocks = mask_table_blocks(lines, opts)
+    local input = table.concat(masked, "\n") .. "\n"
+    local output = vim.fn.systemlist(cmd, input)
+    local code = vim.v.shell_error
+
+    if code ~= 0 then
+        local label = type(cmd) == "table" and table.concat(cmd, " ") or cmd
+
+        if not external_fallback_enabled(opts) then
+            vim.notify("External markdown reflow failed: " .. label, vim.log.levels.ERROR)
+            return false
+        end
+
+        vim.notify("External markdown reflow failed; using internal reflow", vim.log.levels.WARN)
+        return nil
+    end
+
+    return restore_table_blocks(output, table_blocks)
 end
 
 local function mark_protected(lines)
@@ -267,11 +444,42 @@ function M.reflow_buffer(bufnr, opts)
     end
 
     local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    local width = target_width(opts)
+    local external_output = run_external_reflow(lines, width, opts)
+
+    if external_output == false then
+        return 0
+    end
+
+    if external_output then
+        local changed = false
+
+        if #external_output ~= #lines then
+            changed = true
+        else
+            for index, line in ipairs(external_output) do
+                if line ~= lines[index] then
+                    changed = true
+                    break
+                end
+            end
+        end
+
+        if changed then
+            vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, external_output)
+        end
+
+        if opts.notify ~= false then
+            vim.notify(string.format("Reflowed Markdown externally at width %d", width))
+        end
+
+        return #external_output
+    end
+
     local protected = mark_protected(lines)
     local output = {}
     local changed = 0
     local paragraph_count = 0
-    local width = target_width(opts)
     local i = 1
 
     while i <= #lines do

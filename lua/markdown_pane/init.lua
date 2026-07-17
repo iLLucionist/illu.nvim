@@ -15,6 +15,9 @@ local M = {
         width = 100,
         wrap = false,
         auto_reflow = true,
+        external_reflow_cmd = nil,
+        external_reflow_fallback = true,
+        external_reflow_protect_tables = true,
         reflow_margin = 8,
         zoom_text_width = 90,
         sticky_heading = true,
@@ -658,6 +661,9 @@ local function reflow_pane_buffer(bufnr, opts)
     markdown_reflow.reflow_buffer(bufnr, {
         width = pane_text_width(),
         force = true,
+        external_reflow_cmd = M.config.external_reflow_cmd,
+        external_reflow_fallback = M.config.external_reflow_fallback,
+        external_reflow_protect_tables = M.config.external_reflow_protect_tables,
         notify = opts.notify == true,
     })
     vim.api.nvim_set_option_value("modified", false, { buf = bufnr })
@@ -948,6 +954,12 @@ function M.toggle_zoom()
         return
     end
 
+    local previous = vim.api.nvim_get_current_win()
+
+    if M.zoomed and previous ~= M.winid and valid_win(previous) then
+        M.last_focus_win = previous
+    end
+
     if M.active_mode == "markdown" then
         save_markdown_view()
     end
@@ -962,6 +974,11 @@ function M.toggle_zoom()
     end
 
     update_sticky_heading()
+
+    if M.zoomed then
+        vim.api.nvim_set_current_win(M.winid)
+    end
+
     vim.notify("Pane zoom " .. (M.zoomed and "on" or "off"), vim.log.levels.INFO)
 end
 

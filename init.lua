@@ -548,6 +548,12 @@ end
 map('n', '<leader>fm', markdown_headings, {})
 
 local markdown_pane = require("markdown_pane")
+local markdown_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" }
+
+markdown_pane.setup({
+    external_reflow_cmd = markdown_reflow_cmd,
+    external_reflow_protect_tables = true,
+})
 
 vim.api.nvim_create_user_command("MarkdownPaneToggle", function(opts)
     markdown_pane.toggle(opts.args)
@@ -656,6 +662,11 @@ map('x', '<leader>pa', function()
 end, {})
 
 local markdown_reflow = require("markdown_reflow")
+
+markdown_reflow.setup({
+    external_reflow_cmd = markdown_reflow_cmd,
+    external_reflow_protect_tables = true,
+})
 
 vim.api.nvim_create_user_command("MarkdownReflow", function(opts)
     markdown_reflow.reflow_buffer(0, { width = tonumber(opts.args) })
