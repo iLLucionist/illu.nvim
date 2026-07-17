@@ -717,6 +717,10 @@ setup_pane_maps = function(bufnr)
     end, "Toggle markdown/agent pane")
 
     if bufnr == M.bufnr then
+        map("gf", function()
+            require("smart_gf").open()
+        end, "Smart go to file from markdown pane")
+
         map(M.config.wrap_toggle_key, function()
             M.toggle_wrap()
         end, "Toggle markdown pane wrap")

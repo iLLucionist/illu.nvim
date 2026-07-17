@@ -345,6 +345,7 @@ require("barbar").setup({
 map("n", "<S-h>", "<cmd>BufferPrevious<CR>", { silent = true })
 map("n", "<S-l>", "<cmd>BufferNext<CR>", { silent = true })
 map("n", "<leader>bp", "<cmd>BufferPick<CR>", { silent = true })
+map("n", "<leader>bq", "<cmd>BufferClose<CR>", { silent = true })
 
 for i = 1, 9 do
     map("n", "<leader>" .. i, "<cmd>BufferGoto " .. i .. "<CR>", { silent = true })
