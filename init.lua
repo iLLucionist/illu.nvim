@@ -557,11 +557,95 @@ vim.api.nvim_create_user_command("MarkdownPanePick", function()
     markdown_pane.pick()
 end, {})
 
-map('n', '<leader>mm', function()
+vim.api.nvim_create_user_command("PaneSwitch", function()
+    markdown_pane.switch_picker()
+end, {})
+
+vim.api.nvim_create_user_command("PaneTool", function(opts)
+    local parts = vim.split(opts.args or "", "%s+", { trimempty = true })
+
+    if not parts[1] then
+        markdown_pane.switch_picker()
+        return
+    end
+
+    markdown_pane.open_terminal(parts[1], parts[2])
+end, { nargs = "*" })
+
+vim.api.nvim_create_user_command("PaneCodex", function(opts)
+    local preset = opts.args ~= "" and opts.args or nil
+    markdown_pane.open_terminal("codex", preset)
+end, { nargs = "?" })
+
+vim.api.nvim_create_user_command("PaneClaude", function(opts)
+    local preset = opts.args ~= "" and opts.args or nil
+    markdown_pane.open_terminal("claude", preset)
+end, { nargs = "?" })
+
+vim.api.nvim_create_user_command("PaneFocus", function()
+    markdown_pane.focus_toggle()
+end, {})
+
+vim.api.nvim_create_user_command("PaneAsk", function(opts)
+    markdown_pane.ask_picker({
+        bufnr = vim.api.nvim_get_current_buf(),
+        line1 = opts.line1,
+        line2 = opts.line2,
+    })
+end, { range = true })
+
+vim.api.nvim_create_user_command("PaneAskCodex", function(opts)
+    local preset = opts.args ~= "" and opts.args or nil
+
+    markdown_pane.ask("codex", preset, {
+        bufnr = vim.api.nvim_get_current_buf(),
+        line1 = opts.line1,
+        line2 = opts.line2,
+    })
+end, { nargs = "?", range = true })
+
+vim.api.nvim_create_user_command("PaneAskClaude", function(opts)
+    local preset = opts.args ~= "" and opts.args or nil
+
+    markdown_pane.ask("claude", preset, {
+        bufnr = vim.api.nvim_get_current_buf(),
+        line1 = opts.line1,
+        line2 = opts.line2,
+    })
+end, { nargs = "?", range = true })
+
+map('n', '<leader>pp', function()
     markdown_pane.toggle()
 end, {})
 map('n', '<leader>mP', function()
     markdown_pane.pick()
+end, {})
+map('n', '<leader>p0', function()
+    markdown_pane.show_markdown()
+end, {})
+map('n', '<leader>px', function()
+    markdown_pane.open_terminal("codex", nil, {
+        bufnr = vim.api.nvim_get_current_buf(),
+        focus = true,
+    })
+end, {})
+map('n', '<leader>pc', function()
+    markdown_pane.open_terminal("claude", nil, {
+        bufnr = vim.api.nvim_get_current_buf(),
+        focus = true,
+    })
+end, {})
+map('n', '<leader>pf', function()
+    markdown_pane.focus_toggle()
+end, {})
+map('n', '<leader>ps', function()
+    markdown_pane.switch_picker()
+end, {})
+map('x', '<leader>pa', function()
+    markdown_pane.ask_picker({
+        bufnr = vim.api.nvim_get_current_buf(),
+        visual = true,
+    })
 end, {})
 
 local markdown_reflow = require("markdown_reflow")
