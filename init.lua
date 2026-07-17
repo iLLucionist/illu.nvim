@@ -12,6 +12,8 @@ vim.g.loaded_netrwPllugin = 1
 local set = vim.opt
 local map = vim.keymap.set
 local cmd = vim.cmd
+local config_file = debug.getinfo(1, "S").source:sub(2)
+local config_dir = vim.fn.fnamemodify(vim.loop.fs_realpath(config_file) or config_file, ":p:h")
 
 -- Init package manager
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -35,6 +37,7 @@ require("lazy").setup({
     "Mofiqul/vscode.nvim",
     "projekt0n/github-nvim-theme",
     { "catppuccin/nvim", name="catppuccin"},
+    { "EdenEast/nightfox.nvim" },
     -- Statusline / Tabline
     "nvim-lualine/lualine.nvim",
     "nvim-tree/nvim-web-devicons",
@@ -49,12 +52,21 @@ require("lazy").setup({
     "folke/trouble.nvim",
     "cuducos/yaml.nvim",
     -- Treesitter
-    { "nvim-treesitter/nvim-treesitter", opts = {
-        highlight = { enable = true }
-    }, cmd = "TSUpdate" },
-    "nvim-treesitter/nvim-treesitter-textobjects",
+    {
+        "neovim-treesitter/nvim-treesitter",
+        dependencies = {
+            "neovim-treesitter/treesitter-parser-registry",
+        },
+        lazy = false,
+        build = ":TSUpdate"
+    },
+    {
+        "nvim-treesitter/nvim-treesitter-textobjects",
+        branch = "main",
+        lazy = false
+    },
     -- Motion
-    "ggandor/leap.nvim",
+    "https://codeberg.org/andyg/leap.nvim",
     -- Fuzzy finding
     "nvim-lua/plenary.nvim",
     "nvim-telescope/telescope.nvim",
@@ -102,13 +114,26 @@ require("lazy").setup({
     "tpope/vim-dadbod",
     "kristijanhusak/vim-dadbod-ui",
     -- Toggle diagnostics
-    "WhoIsSethDaniel/toggle-lsp-diagnostics.nvim",
+    -- "WhoIsSethDaniel/toggle-lsp-diagnostics.nvim",
     -- REPL
     "hkupty/iron.nvim",
     "nyngwang/NeoZoom.lua",
     -- TAILWIND
-    "luckasRanarison/tailwind-tools.nvim"
+    "luckasRanarison/tailwind-tools.nvim",
+    -- Markdown
+    {
+        "OXY2DEV/markview.nvim",
+        lazy = false,
+        opts = {
+            markdown = {
+                block_quotes = { wrap = false },
+                headings = { org_indent_wrap = false },
+                list_items = { wrap = false },
+            },
+        },
+    }
 })
+set.rtp:prepend(config_dir)
 
 -- Essential key mappings
 map('n', '<Cr>', 'i', { silent = true })
@@ -124,8 +149,8 @@ map('n', '<C-j>', '<C-w>j', { silent = true })
 map('n', '<C-k>', '<C-w>k', { silent = true })
 map('n', '<C-l>', '<C-w>l', { silent = true })
 map('n', '<leader>tt', ':tabnew<Cr>', { silent = true })
-map('n', '<leader>tk', ':tabnext<Cr>', { silent = true })
-map('n', '<leader>tj', ':tabprev<Cr>', { silent = true })
+map('n', '<leader>tl', ':tabnext<Cr>', { silent = true })
+map('n', '<leader>th', ':tabprev<Cr>', { silent = true })
 map('n', '<leader>uu', ':Lazy update<Cr>', { silent = true })
 -- Move line up / down
 map('n', '<leader>k', 'ddkP', { silent = true })
@@ -136,6 +161,14 @@ map('n', '<leader>o', 'o<Esc>', { silent = true })
 -- Open terminal
 map('n', '<leader>ot', ':vsplit | terminal<CR>', { silent = true })
 map('n', '<leader>ht', ':split | terminal<CR>', { silent = true })
+map("n", "<leader>tj", "<cmd>belowright split | terminal<cr>")
+map("n", "<leader>tsj", function()
+    local height = math.floor(vim.o.lines * 0.33)
+    vim.cmd("belowright" .. height .. "split | terminal")
+    vim.cmd("startinsert")
+end)
+
+
 
 
 -- Sane defaults
@@ -185,12 +218,59 @@ set.scrolloff = 8
 set.sidescrolloff = 15
 set.sidescroll = 1
 
+-- Markview can only fully render wide tables when soft wrapping is disabled.
+vim.api.nvim_create_autocmd("FileType", {
+    pattern = "markdown",
+    callback = function()
+        vim.opt_local.wrap = false
+    end,
+})
+
 -- Relative line numbers
 vim.wo.relativenumber = true
 
 -- Color
-vim.g.illuColor = 'light'
+vim.g.illuColor = 'dark'
 vim.opt.termguicolors = true
+
+local function blend_hex(color, target, alpha)
+    local r = math.floor(color / 0x10000) % 0x100
+    local g = math.floor(color / 0x100) % 0x100
+    local b = color % 0x100
+    local tr = math.floor(target / 0x10000) % 0x100
+    local tg = math.floor(target / 0x100) % 0x100
+    local tb = target % 0x100
+
+    return string.format(
+        "#%02x%02x%02x",
+        math.floor(r + (tr - r) * alpha + 0.5),
+        math.floor(g + (tg - g) * alpha + 0.5),
+        math.floor(b + (tb - b) * alpha + 0.5)
+    )
+end
+
+local function set_markview_code_highlights()
+    local normal = vim.api.nvim_get_hl(0, { name = "Normal", link = false })
+
+    if not normal.bg then
+        return
+    end
+
+    local comment = vim.api.nvim_get_hl(0, { name = "Comment", link = false })
+    local raw = vim.api.nvim_get_hl(0, { name = "@markup.raw", link = false })
+    local target = vim.o.background == "dark" and 0xffffff or 0x000000
+    local code_bg = blend_hex(normal.bg, target, vim.o.background == "dark" and 0.08 or 0.06)
+    local inline_bg = blend_hex(normal.bg, target, vim.o.background == "dark" and 0.12 or 0.06)
+
+    vim.api.nvim_set_hl(0, "MarkviewCode", { bg = code_bg })
+    vim.api.nvim_set_hl(0, "MarkviewCodeInfo", { bg = code_bg, fg = comment.fg })
+    vim.api.nvim_set_hl(0, "MarkviewCodeFg", { fg = code_bg })
+    vim.api.nvim_set_hl(0, "MarkviewInlineCode", { bg = inline_bg, fg = raw.fg or normal.fg })
+end
+
+vim.api.nvim_create_autocmd("ColorScheme", {
+    callback = set_markview_code_highlights,
+})
 
 -- vim.opt.guicursor = ""
 -- require("tokyonight").setup({
@@ -211,20 +291,41 @@ vim.opt.termguicolors = true
 -- cmd("colorscheme tokyonight-night")
 -- xs
 cmd("colorscheme tokyonight-night")
+set_markview_code_highlights()
 
 
 
 function ToggleColor()
+    local themes = {
+        light = {
+            cursor_normal = { fg = "#ffffff", bg = "#808080"},
+            cursor_insert = { fg = "#ffffff", bg = "#808080"},
+            cursor_terminal = { fg = "#ffffff", bg = "#ff0000"},
+        },
+        dark = {
+            cursor_normal = { fg = "#000000", bg = "#ffcc00"},
+            cursor_insert = { fg = "#000000", bg = "#ffcc00"},
+            cursor_terminal = { fg = "#ffffff", bg = "#ff0000"},
+        },
+    }
     if vim.g.illuColor == 'light' then
         vim.g.illuColor = 'dark'
         set.background = "dark"
         cmd("colorscheme tokyonight-night")
         cmd("mode")
+        vim.api.nvim_set_hl(0, "CursorNormal", themes.dark.cursor_normal)
+        vim.api.nvim_set_hl(0, "CursorInsert", themes.dark.cursor_insert)
+        vim.api.nvim_set_hl(0, "CursorTerminal", themes.dark.cursor_terminal)
+        vim.opt.guicursor = "n:block-CursorNormal,t:block-CursorTerminal"
     else
         vim.g.illuColor = 'light'
         set.background = "light"
-        cmd("colorscheme github_light")
+        cmd("colorscheme dayfox")
         cmd("mode")
+        vim.api.nvim_set_hl(0, "CursorNormal", themes.light.cursor_normal)
+        vim.api.nvim_set_hl(0, "CursorInsert", themes.light.cursor_insert)
+        vim.api.nvim_set_hl(0, "CursorTerminal", themes.dark.cursor_terminal)
+        vim.opt.guicursor = "n:block-CursorNormal,t:block-CursorTerminal"
     end
 end
 
@@ -241,6 +342,219 @@ map('n', '<leader>fg', builtin.live_grep, {})
 map('n', '<leader>fd', builtin.buffers, {})
 map('n', '<leader>fh', builtin.help_tags, {})
 map('n', '<leader>fp', function() require'telescope'.extensions.project.project{} end, {})
+
+local function markdown_headings()
+    local pickers = require("telescope.pickers")
+    local finders = require("telescope.finders")
+    local entry_display = require("telescope.pickers.entry_display")
+    local previewers = require("telescope.previewers")
+    local preview_utils = require("telescope.previewers.utils")
+    local conf = require("telescope.config").values
+    local actions = require("telescope.actions")
+    local action_state = require("telescope.actions.state")
+    local markdown_pane = require("markdown_pane")
+    local headings = {}
+    local origin_win = vim.api.nvim_get_current_win()
+    local pane_visible = markdown_pane.is_open()
+    local bufnr = pane_visible and markdown_pane.bufnr or vim.api.nvim_get_current_buf()
+    local target_win = pane_visible and markdown_pane.winid or origin_win
+    local ok, parser = pcall(vim.treesitter.get_parser, bufnr, "markdown")
+
+    if not ok or not parser then
+        vim.notify("No markdown parser available", vim.log.levels.WARN)
+        return
+    end
+
+    local function heading_level(node)
+        for child in node:iter_children() do
+            local node_type = child:type()
+
+            if node_type:match("^atx_h%d_marker$") then
+                return tonumber(node_type:match("%d")) or 1
+            elseif node_type == "setext_h1_underline" then
+                return 1
+            elseif node_type == "setext_h2_underline" then
+                return 2
+            end
+        end
+
+        return 1
+    end
+
+    local function clean_heading_title(text)
+        text = text:gsub("%s+", " ")
+        text = text:gsub("^%s+", "")
+        text = text:gsub("%s+#+%s*$", "")
+        text = text:gsub("%s+$", "")
+
+        return text
+    end
+
+    local heading_icons = {
+        [1] = "󰉫",
+        [2] = "󰉬",
+        [3] = "󰉭",
+        [4] = "󰉮",
+        [5] = "󰉯",
+        [6] = "󰉰",
+    }
+
+    local function visit(node)
+        local node_type = node:type()
+
+        if node_type == "atx_heading" or node_type == "setext_heading" then
+            local content = node:field("heading_content")[1]
+
+            if content then
+                local start_row = node:range()
+                local title = clean_heading_title(vim.treesitter.get_node_text(content, bufnr))
+
+                table.insert(headings, {
+                    lnum = start_row + 1,
+                    level = heading_level(node),
+                    title = title,
+                })
+            end
+        end
+
+        for child in node:iter_children() do
+            visit(child)
+        end
+    end
+
+    for _, tree in ipairs(parser:parse()) do
+        visit(tree:root())
+    end
+
+    table.sort(headings, function(a, b)
+        return a.lnum < b.lnum
+    end)
+
+    if vim.tbl_isempty(headings) then
+        vim.notify("No markdown headings found", vim.log.levels.INFO)
+        return
+    end
+
+    local displayer = entry_display.create({
+        separator = " ",
+        items = {
+            { width = 4 },
+            { width = 2 },
+            { remaining = true },
+        },
+    })
+
+    pickers.new({}, {
+        prompt_title = "Markdown Headings",
+        finder = finders.new_table({
+            results = headings,
+            entry_maker = function(entry)
+                local indent = string.rep("  ", entry.level - 1)
+                local icon = heading_icons[entry.level] or "󰉫"
+
+                return {
+                    value = entry,
+                    ordinal = string.format("%d %s", entry.lnum, entry.title),
+                    display = function()
+                        return displayer({
+                            { string.format("%4d", entry.lnum), "LineNr" },
+                            { icon, "MarkviewHeading" .. entry.level },
+                            indent .. entry.title,
+                        })
+                    end,
+                    lnum = entry.lnum,
+                }
+            end,
+        }),
+        previewer = previewers.new_buffer_previewer({
+            title = "Markdown preview",
+            get_buffer_by_name = function()
+                return "markdown_headings_" .. tostring(bufnr)
+            end,
+            define_preview = function(self, entry)
+                if not self.state.bufname then
+                    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+
+                    vim.api.nvim_set_option_value("modifiable", true, { buf = self.state.bufnr })
+                    vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
+                    vim.api.nvim_set_option_value("filetype", "markdown", { buf = self.state.bufnr })
+                    vim.api.nvim_set_option_value("modifiable", false, { buf = self.state.bufnr })
+                    preview_utils.highlighter(self.state.bufnr, "markdown")
+                end
+
+                if self.state.winid and vim.api.nvim_win_is_valid(self.state.winid) then
+                    local line_count = vim.api.nvim_buf_line_count(self.state.bufnr)
+                    local target = math.min(entry.value.lnum, line_count)
+
+                    vim.api.nvim_set_option_value("number", true, { win = self.state.winid })
+                    vim.api.nvim_set_option_value("relativenumber", false, { win = self.state.winid })
+                    vim.api.nvim_set_option_value("cursorline", true, { win = self.state.winid })
+                    vim.api.nvim_set_option_value("wrap", false, { win = self.state.winid })
+                    vim.api.nvim_win_set_cursor(self.state.winid, { target, 0 })
+                    vim.api.nvim_win_call(self.state.winid, function()
+                        vim.cmd("normal! zz")
+                    end)
+                end
+            end,
+        }),
+        sorter = conf.generic_sorter({}),
+        attach_mappings = function(prompt_bufnr, telescope_map)
+            telescope_map("i", "<C-n>", actions.move_selection_next)
+            telescope_map("i", "<C-p>", actions.move_selection_previous)
+            telescope_map("n", "<C-n>", actions.move_selection_next)
+            telescope_map("n", "<C-p>", actions.move_selection_previous)
+
+            actions.select_default:replace(function()
+                local selection = action_state.get_selected_entry()
+                actions.close(prompt_bufnr)
+
+                if not selection or not vim.api.nvim_win_is_valid(target_win) then
+                    return
+                end
+
+                vim.api.nvim_win_call(target_win, function()
+                    vim.api.nvim_win_set_cursor(0, { selection.value.lnum, 0 })
+                    vim.cmd("normal! zz")
+                end)
+
+                if pane_visible and vim.api.nvim_win_is_valid(origin_win) then
+                    vim.api.nvim_set_current_win(origin_win)
+                end
+            end)
+
+            return true
+        end,
+    }):find()
+end
+
+map('n', '<leader>fm', markdown_headings, {})
+
+local markdown_pane = require("markdown_pane")
+
+vim.api.nvim_create_user_command("MarkdownPaneToggle", function(opts)
+    markdown_pane.toggle(opts.args)
+end, { nargs = "?", complete = "file" })
+
+vim.api.nvim_create_user_command("MarkdownPanePick", function()
+    markdown_pane.pick()
+end, {})
+
+map('n', '<leader>mm', function()
+    markdown_pane.toggle()
+end, {})
+map('n', '<leader>mP', function()
+    markdown_pane.pick()
+end, {})
+
+local markdown_reflow = require("markdown_reflow")
+
+vim.api.nvim_create_user_command("MarkdownReflow", function(opts)
+    markdown_reflow.reflow_buffer(0, { width = tonumber(opts.args) })
+end, { nargs = "?" })
+
+map('n', '<leader>mR', function()
+    markdown_reflow.reflow_buffer(0)
+end, {})
 
 local fb_actions = require("telescope").extensions.file_browser.actions
 
@@ -423,7 +737,7 @@ map('n', '<leader>pt', '<cmd>Glance type_definitions<CR>')
 map('n', '<leader>pi', '<cmd>Glance implementations<CR>')
 
 require('trouble').setup()
-map('n', '<leader>xx', '<cmd>TroubleToggle<cr>')
+map('n', '<leader>xx', '<cmd>Trouble diagnostics toggle<cr>')
 map('n', '<leader>xw', '<cmd>TroubleToggle workspace_diagnostics<cr>')
 map('n', '<leader>xd', '<cmd>TroubleToggle document_diagnostics<cr>')
 map('n', '<leader>xq', '<cmd>TroubleToggle quickfix<cr>')
@@ -432,52 +746,87 @@ map('n', '<leader>gR', '<cmd>TroubleToggle lsp_references<cr>')
 
 
 -- Treesitter
-require("nvim-treesitter.configs").setup({
-    ensure_installed = { "lua", "vim", "vimdoc", "css", "json", "javascript", "latex", "python", "r", "regex", "scss", "yaml", "html", "css", "vue", "svelte", "go", "typescript", "sql","markdown", "rnoweb" },
-    highlight = {
-        enable = true,
-        additional_vim_regex_highlighting = true
-    },
-    indent = { enable = true },
-    rainbow = {
-        enable = true,
-        extended_mode = true
-    },
-    yaml = {
-        enable = true
-    },
-    go = {
-        enable = true
-    },
-    typescript = {
-        enable = true
-    },
-    svelte = {
-        enable = true
-    },
-    sql = {
-        enable = true
-    },
-    python = {
-        enable = true
-    },
+local treesitter_parsers = {
+    "lua",
+    "vim",
+    "vimdoc",
+    "css",
+    -- Query-only dependencies used by HTML and JavaScript-family parsers.
+    "ecma",
+    "html_tags",
+    "jsx",
+    "json",
+    "javascript",
+    "latex",
+    "python",
+    "r",
+    "regex",
+    "scss",
+    "yaml",
+    "html",
+    "vue",
+    "svelte",
+    "go",
+    "typescript",
+    "sql",
+    "markdown",
+    "markdown_inline",
+    "rnoweb",
+}
 
-    textobjects = {
-        move = {
-            enable = true,
-            set_jumps = true,
-            goto_next_start = {
-                ["]a"] = "@attribute.outer",
-                ["]t"] = "@function.outer",
-            },
-            goto_previous_start = {
-                ["[a"] = "@attribute.outer",
-                ["[t"] = "@function.outer",
-            },
-        }
-    }
+require("nvim-treesitter").install(treesitter_parsers)
 
+vim.api.nvim_create_autocmd("FileType", {
+    pattern = {
+        "lua",
+        "vim",
+        "help",
+        "css",
+        "json",
+        "javascript",
+        "tex",
+        "python",
+        "r",
+        "scss",
+        "yaml",
+        "html",
+        "vue",
+        "svelte",
+        "go",
+        "typescript",
+        "sql",
+        "markdown",
+        "rnoweb",
+    },
+    callback = function()
+        vim.treesitter.start()
+        vim.bo.indentexpr = "v:lua.require'nvim-treesitter'.indentexpr()"
+    end,
 })
+
+require("nvim-treesitter-textobjects").setup({
+    move = {
+        set_jumps = true,
+    },
+})
+
+local ts_move = require("nvim-treesitter-textobjects.move")
+
+map({ "n", "x", "o" }, "]a", function()
+    ts_move.goto_next_start("@attribute.outer", "textobjects")
+end)
+
+map({ "n", "x", "o" }, "]t", function()
+    ts_move.goto_next_start("@function.outer", "textobjects")
+end)
+
+map({ "n", "x", "o" }, "[a", function()
+    ts_move.goto_previous_start("@attribute.outer", "textobjects")
+end)
+
+map({ "n", "x", "o" }, "[t", function()
+    ts_move.goto_previous_start("@function.outer", "textobjects")
+end)
 
 -- git
 map('n', '<Space>ggg', ":LazyGit<CR>")
@@ -499,13 +848,19 @@ map('n', '<leader>aa', '<cmd>AerialToggle!<CR>')
 
 require("yaml_nvim")
 require("nvim-autopairs").setup()
-require("nvim-ts-autotag").setup()
+-- require("nvim-ts-autotag").setup()
 require('Comment').setup()
 require("nvim-surround").setup()
 
 -- Tree sidebar files
 
-require("nvim-tree").setup()
+require("nvim-tree").setup({
+    actions = {
+        open_file = {
+            quit_on_open = true,
+        },
+    },
+})
 map('n', '<leader>ss', '<cmd>NvimTreeToggle<CR>')
 
 -- R specific
@@ -518,8 +873,8 @@ map('t', 'jk', '<C-\\><C-n>')
 map('t', 'kj', '<C-\\><C-n>')
 
 -- Toggle diagnostics
-require('toggle_lsp_diagnostics').init()
-map('n', '<Space>dd', ":ToggleDiag<CR>")
+-- require('toggle_lsp_diagnostics').init()
+-- map('n', '<Space>dd', ":ToggleDiag<CR>")
 
 -- REPL
 local iron = require("iron.core")
