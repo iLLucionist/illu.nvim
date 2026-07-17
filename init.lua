@@ -586,6 +586,10 @@ vim.api.nvim_create_user_command("PaneFocus", function()
     markdown_pane.focus_toggle()
 end, {})
 
+vim.api.nvim_create_user_command("PaneZoom", function()
+    markdown_pane.toggle_zoom()
+end, {})
+
 vim.api.nvim_create_user_command("PaneAsk", function(opts)
     markdown_pane.ask_picker({
         bufnr = vim.api.nvim_get_current_buf(),
@@ -637,6 +641,9 @@ map('n', '<leader>pc', function()
 end, {})
 map('n', '<leader>pf', function()
     markdown_pane.focus_toggle()
+end, {})
+map('n', '<leader>pz', function()
+    markdown_pane.toggle_zoom()
 end, {})
 map('n', '<leader>ps', function()
     markdown_pane.switch_picker()

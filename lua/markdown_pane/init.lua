@@ -7,6 +7,7 @@ local M = {
     active_terminal_key = nil,
     last_terminal_key = nil,
     last_focus_win = nil,
+    zoomed = false,
     markdown_view = nil,
     terminals = {},
     question_buffers = {},
@@ -15,6 +16,7 @@ local M = {
         wrap = false,
         auto_reflow = true,
         reflow_margin = 8,
+        zoom_text_width = 90,
         sticky_heading = true,
         wrap_toggle_key = "<leader>mw",
         focus_on_switch = true,
@@ -347,6 +349,18 @@ local function effective_wrap()
     return preferred_wrap()
 end
 
+local function pane_width()
+    if not M.zoomed then
+        return M.config.width
+    end
+
+    local reserved = math.max(1, tonumber(vim.o.winminwidth) or 1)
+    local separator = 1
+    local max_width = vim.o.columns - reserved - separator
+
+    return math.max(M.config.width, max_width)
+end
+
 local function pane_text_width(winid)
     winid = winid or M.winid
 
@@ -360,7 +374,13 @@ local function pane_text_width(winid)
         width = width - vim.api.nvim_get_option_value("numberwidth", { win = winid })
     end
 
-    return math.max(20, width - M.config.reflow_margin)
+    local text_width = math.max(20, width - M.config.reflow_margin)
+
+    if M.zoomed and M.config.zoom_text_width and M.config.zoom_text_width > 0 then
+        return math.min(text_width, M.config.zoom_text_width)
+    end
+
+    return text_width
 end
 
 local function save_markdown_view()
@@ -523,7 +543,13 @@ local function update_sticky_heading()
 
     if M.active_mode ~= "markdown" then
         local max_width = math.max(10, vim.api.nvim_win_get_width(M.winid) - 4)
-        local label = truncate_display(terminal_winbar_title(), max_width)
+        local title = terminal_winbar_title()
+
+        if M.zoomed then
+            title = title .. " [zoom]"
+        end
+
+        local label = truncate_display(title, max_width)
 
         vim.api.nvim_set_option_value("winbar", "%#WinBar# " .. statusline_escape(label) .. " %*", { win = M.winid })
         return
@@ -538,6 +564,10 @@ local function update_sticky_heading()
     end
 
     title = "Markdown: " .. title
+
+    if M.zoomed then
+        title = title .. " [zoom]"
+    end
 
     local max_width = math.max(10, vim.api.nvim_win_get_width(M.winid) - 4)
     local label = truncate_display(title, max_width)
@@ -606,6 +636,35 @@ render_markview = function(bufnr)
     pcall(markview.render, bufnr, { enable = true, hybrid_mode = false })
 end
 
+local function reflow_pane_buffer(bufnr, opts)
+    opts = opts or {}
+    bufnr = bufnr or M.bufnr
+
+    if not M.config.auto_reflow or not valid_buf(bufnr) then
+        return
+    end
+
+    local ok, markdown_reflow = pcall(require, "markdown_reflow")
+
+    if not ok then
+        return
+    end
+
+    local readonly = vim.api.nvim_get_option_value("readonly", { buf = bufnr })
+    local modifiable = vim.api.nvim_get_option_value("modifiable", { buf = bufnr })
+
+    vim.api.nvim_set_option_value("readonly", false, { buf = bufnr })
+    vim.api.nvim_set_option_value("modifiable", true, { buf = bufnr })
+    markdown_reflow.reflow_buffer(bufnr, {
+        width = pane_text_width(),
+        force = true,
+        notify = opts.notify == true,
+    })
+    vim.api.nvim_set_option_value("modified", false, { buf = bufnr })
+    vim.api.nvim_set_option_value("readonly", readonly, { buf = bufnr })
+    vim.api.nvim_set_option_value("modifiable", modifiable, { buf = bufnr })
+end
+
 local function apply_wrap_state()
     if not valid_win(M.winid) or not valid_buf(M.bufnr) then
         return
@@ -668,7 +727,7 @@ local function ensure_win(bufnr, mode, opts)
             vim.api.nvim_win_set_buf(M.winid, bufnr)
         end
 
-        vim.api.nvim_win_set_width(M.winid, M.config.width)
+        vim.api.nvim_win_set_width(M.winid, pane_width())
         set_window_options(M.winid, mode)
 
         if opts.focus then
@@ -686,10 +745,10 @@ local function ensure_win(bufnr, mode, opts)
 
     local previous = vim.api.nvim_get_current_win()
 
-    vim.cmd("botright vertical " .. M.config.width .. "split")
+    vim.cmd("botright vertical " .. pane_width() .. "split")
     M.winid = vim.api.nvim_get_current_win()
     vim.api.nvim_win_set_buf(M.winid, bufnr)
-    vim.api.nvim_win_set_width(M.winid, M.config.width)
+    vim.api.nvim_win_set_width(M.winid, pane_width())
     set_window_options(M.winid, mode)
     update_sticky_heading()
 
@@ -728,17 +787,7 @@ local function load_file(path)
     vim.api.nvim_set_option_value("filetype", "markdown", { buf = bufnr })
     pcall(vim.treesitter.start, bufnr, "markdown")
 
-    if M.config.auto_reflow then
-        local ok, markdown_reflow = pcall(require, "markdown_reflow")
-
-        if ok then
-            markdown_reflow.reflow_buffer(bufnr, {
-                width = pane_text_width(),
-                force = true,
-                notify = false,
-            })
-        end
-    end
+    reflow_pane_buffer(bufnr)
 
     vim.api.nvim_set_option_value("modified", false, { buf = bufnr })
     vim.api.nvim_set_option_value("readonly", true, { buf = bufnr })
@@ -890,6 +939,30 @@ function M.focus_toggle()
     if valid_win(M.winid) then
         vim.api.nvim_set_current_win(M.winid)
     end
+end
+
+function M.toggle_zoom()
+    M.zoomed = not M.zoomed
+
+    if not valid_win(M.winid) then
+        return
+    end
+
+    if M.active_mode == "markdown" then
+        save_markdown_view()
+    end
+
+    pcall(vim.api.nvim_win_set_width, M.winid, pane_width())
+    set_window_options(M.winid, M.active_mode == "markdown" and "markdown" or "terminal")
+
+    if M.active_mode == "markdown" and valid_buf(M.bufnr) then
+        reflow_pane_buffer(M.bufnr)
+        render_markview(M.bufnr)
+        restore_markdown_view()
+    end
+
+    update_sticky_heading()
+    vim.notify("Pane zoom " .. (M.zoomed and "on" or "off"), vim.log.levels.INFO)
 end
 
 function M.text_width()
