@@ -254,16 +254,19 @@ local function check_layout(config)
             info(name .. " is not configured.")
         elseif type(values) ~= "table" then
             error("Invalid " .. name .. " config.", "Use a table of width values.")
-            return
         else
+            local invalid = false
+
             for index, value in ipairs(values) do
                 if not valid_width_value(value) then
                     error("Invalid " .. name .. " entry at index " .. index, "Use columns, a percentage string, a fraction string, or a numeric ratio.")
-                    return
+                    invalid = true
                 end
             end
 
-            ok(name .. " configured: " .. tostring(#values))
+            if not invalid then
+                ok(name .. " configured: " .. tostring(#values))
+            end
         end
     end
 end

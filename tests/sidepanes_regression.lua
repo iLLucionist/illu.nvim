@@ -1541,6 +1541,7 @@ test("health check reports malformed config", function()
 
     assert(has_health_report(reports, "error", "External reflow command not found"), "health did not report missing reflow command")
     assert(has_health_report(reports, "error", "Invalid width_snap_points entry at index 2"), "health did not report invalid width snap point")
+    assert(has_health_report(reports, "error", "Invalid width_picker_points entry at index 2"), "health did not report invalid width picker point")
     assert(has_health_report(reports, "warn", "External reflow table protection is disabled."), "health did not report table protection warning")
     assert(has_health_report(reports, "error", "Invalid command name for toggle"), "health did not report invalid command name")
     assert(has_health_report(reports, "error", "Invalid global mapping for toggle"), "health did not report invalid global mapping")
@@ -2889,6 +2890,29 @@ test("width picker selects common configured width points", function()
         assert(sidepanes.get_width() == 100, "width picker did not apply selected common point")
         assert(pane.relative_width and pane.relative_width.ratio == 0.5, "width picker did not preserve relative target when sticky")
         assert(has_notify(messages, "Sidepanes width: 1/2 (100 cols); previous 80 (80 cols); next 120"), "width picker did not notify selected and neighboring points")
+    end)
+end)
+
+test("width picker falls back to snap points when picker points are not configured", function()
+    reset_pane()
+
+    with_options({ columns = 200, winminwidth = 1 }, function()
+        pane.setup({
+            width = 80,
+            sticky_relative_width = false,
+            width_snap_points = { 80, "1/2", 120 },
+            width_picker_points = nil,
+        })
+
+        pane.config.width_picker_points = nil
+        pane._test_next_choice = "2"
+
+        capture_notify(function()
+            sidepanes.width_picker()
+        end)
+
+        assert(sidepanes.get_width() == 100, "width picker did not fall back to snap points")
+        assert(pane.relative_width == nil, "nonsticky fallback picker stored relative width")
     end)
 end)
 
