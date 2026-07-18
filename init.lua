@@ -370,6 +370,7 @@ sidepanes.setup({
         width = 100,
         zoom_text_width = 90,
         sticky_relative_width = false,
+        width_snap_points = { 60, 70, 80, 90, 100, 110, 120, "1/3", "40%", "1/2", "60%", "2/3", "75%" },
     },
     markdown = {
         wrap = false,
@@ -424,6 +425,8 @@ sidepanes.setup({
             clear_ipython = "<leader>pX",
             focus = "<leader>pf",
             zoom = "<leader>pz",
+            width_previous = "<leader>p-",
+            width_next = "<leader>p+",
             sticky_relative_width = "<leader>p%",
             switch = "<leader>ps",
             ask = "<leader>pa",

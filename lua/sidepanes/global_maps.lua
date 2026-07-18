@@ -93,6 +93,14 @@ function M.setup(api, mappings)
         api.toggle_zoom()
     end, "Toggle sidepanes zoom")
 
+    map("n", mappings.width_previous, function()
+        api.snap_width("previous")
+    end, "Decrease sidepanes width to snap point")
+
+    map("n", mappings.width_next, function()
+        api.snap_width("next")
+    end, "Increase sidepanes width to snap point")
+
     map("n", mappings.sticky_relative_width, function()
         api.toggle_sticky_relative_width()
     end, "Toggle sidepanes sticky relative width")

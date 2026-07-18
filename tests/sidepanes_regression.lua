@@ -244,6 +244,7 @@ test("public facade hides mutable state and exposes config copy", function()
         "get_width",
         "set_width",
         "adjust_width",
+        "snap_width",
         "toggle_sticky_relative_width",
         "show_markdown",
         "switch_picker",
@@ -387,6 +388,9 @@ test("width parser accepts columns percentages fractions and deltas", function()
     local minus_delta = assert(api_helpers.resolve_width_delta("-5", 80))
     local numeric_delta = assert(api_helpers.resolve_width_delta(7, 80))
     local bad_width, bad_err = api_helpers.resolve_width("wide", 80)
+    local snap_next, _, snap_next_spec = assert(api_helpers.resolve_width_snap(91, "next", { 80, 90, 100, "5/6" }))
+    local snap_previous = assert(api_helpers.resolve_width_snap(99, "previous", { 80, 90, 100, "5/6" }))
+    local bad_snap, bad_snap_err = api_helpers.resolve_width_snap(99, "sideways", { 80 })
 
     vim.o.columns = old_columns
     vim.o.winminwidth = old_winminwidth
@@ -403,6 +407,9 @@ test("width parser accepts columns percentages fractions and deltas", function()
     assert(minus_delta == 75, "negative width delta parsed incorrectly")
     assert(numeric_delta == 87, "numeric width delta parsed incorrectly")
     assert(bad_width == nil and bad_err:find("Could not parse pane width", 1, true), "bad width did not return parse error")
+    assert(snap_next == 100 and snap_next_spec and snap_next_spec.ratio == 5 / 6, "next snap did not prefer relative duplicate boundary")
+    assert(snap_previous == 90, "previous snap did not find prior boundary")
+    assert(bad_snap == nil and bad_snap_err:find("snap direction", 1, true), "bad snap direction did not return parse error")
 end)
 
 test("pane-local slot maps exist on markdown and terminal panes", function()
@@ -1024,6 +1031,9 @@ test("global map registration invokes facade callbacks", function()
         toggle_zoom = function()
             calls.zoom = true
         end,
+        snap_width = function(direction)
+            calls.snap_width = direction
+        end,
         toggle_sticky_relative_width = function()
             calls.sticky_relative_width = true
         end,
@@ -1052,6 +1062,8 @@ test("global map registration invokes facade callbacks", function()
         clear_ipython = "<leader>zX",
         focus = "<leader>zf",
         zoom = "<leader>zz",
+        width_previous = "<leader>z-",
+        width_next = "<leader>z+",
         sticky_relative_width = "<leader>z%",
         switch = "<leader>zs",
         ask = "<leader>za",
@@ -1086,6 +1098,10 @@ test("global map registration invokes facade callbacks", function()
     assert(calls.focus == true, "focus map did not call focus toggle")
     global_map("<leader>zz").callback()
     assert(calls.zoom == true, "zoom map did not call zoom toggle")
+    global_map("<leader>z-").callback()
+    assert(calls.snap_width == "previous", "previous width map did not snap down")
+    global_map("<leader>z+").callback()
+    assert(calls.snap_width == "next", "next width map did not snap up")
     global_map("<leader>z%").callback()
     assert(calls.sticky_relative_width == true, "sticky relative width map did not call toggle")
     global_map("<leader>zs").callback()
@@ -1119,6 +1135,7 @@ test("config normalizes ergonomic markdown and tool setup", function()
             width = 88,
             zoom_text_width = 77,
             sticky_relative_width = true,
+            width_snap_points = { 72, "50%" },
         },
         markdown = {
             wrap = true,
@@ -1160,6 +1177,7 @@ test("config normalizes ergonomic markdown and tool setup", function()
     assert(pane.config.width == 88, "layout.width did not map to width")
     assert(pane.config.zoom_text_width == 77, "layout.zoom_text_width did not map to zoom_text_width")
     assert(pane.config.sticky_relative_width == true, "layout.sticky_relative_width did not map to sticky_relative_width")
+    assert(pane.config.width_snap_points[2] == "50%", "layout.width_snap_points did not map to width_snap_points")
     assert(pane.config.wrap == true, "markdown.wrap did not map to wrap")
     assert(pane.config.wrap_toggle_key == "<leader>tw", "markdown.wrap_toggle_key did not map to wrap_toggle_key")
     assert(pane.config.sticky_heading == false, "markdown.sticky_heading did not map to sticky_heading")
@@ -1227,6 +1245,7 @@ test("canonical default setup normalizes to runtime defaults", function()
     assert(setup.layout.width == defaults.config.width, "default setup layout width was wrong")
     assert(setup.layout.zoom_text_width == defaults.config.zoom_text_width, "default setup zoom width was wrong")
     assert(setup.layout.sticky_relative_width == defaults.config.sticky_relative_width, "default setup sticky relative width was wrong")
+    assert(vim.deep_equal(setup.layout.width_snap_points, defaults.config.width_snap_points), "default setup width snap points were wrong")
     assert(setup.markdown.wrap == defaults.config.wrap, "default setup markdown wrap was wrong")
     assert(setup.markdown.reflow.enabled == defaults.config.auto_reflow, "default setup reflow enabled was wrong")
     assert(setup.lifecycle.shutdown_on_exit == defaults.config.shutdown_on_exit, "default setup lifecycle was wrong")
@@ -1239,6 +1258,7 @@ test("runtime config converts to canonical setup shape", function()
         width = 72,
         zoom_text_width = 66,
         sticky_relative_width = true,
+        width_snap_points = { 64, "1/2" },
         wrap = true,
         wrap_toggle_key = "<leader>xw",
         sticky_heading = false,
@@ -1259,6 +1279,7 @@ test("runtime config converts to canonical setup shape", function()
     assert(setup.layout.width == 72, "to_setup lost width")
     assert(setup.layout.zoom_text_width == 66, "to_setup lost zoom text width")
     assert(setup.layout.sticky_relative_width == true, "to_setup lost sticky relative width")
+    assert(setup.layout.width_snap_points[2] == "1/2", "to_setup lost width snap points")
     assert(setup.markdown.wrap == true, "to_setup lost markdown wrap")
     assert(setup.markdown.wrap_toggle_key == "<leader>xw", "to_setup lost wrap mapping")
     assert(setup.markdown.sticky_heading == false, "to_setup lost sticky heading")
@@ -1453,6 +1474,8 @@ test("health check reports malformed config", function()
     local reports = capture_health(function()
         health.check({
             config = {
+                width = 80,
+                width_snap_points = { 80, true },
                 external_reflow_cmd = { "definitely_missing_sidepanes_reflow_cmd" },
                 external_reflow_fallback = false,
                 external_reflow_protect_tables = false,
@@ -1489,6 +1512,7 @@ test("health check reports malformed config", function()
     end)
 
     assert(has_health_report(reports, "error", "External reflow command not found"), "health did not report missing reflow command")
+    assert(has_health_report(reports, "error", "Invalid width snap point at index 2"), "health did not report invalid width snap point")
     assert(has_health_report(reports, "warn", "External reflow table protection is disabled."), "health did not report table protection warning")
     assert(has_health_report(reports, "error", "Invalid command name for toggle"), "health did not report invalid command name")
     assert(has_health_report(reports, "error", "Invalid global mapping for toggle"), "health did not report invalid global mapping")
@@ -1534,6 +1558,7 @@ test("setup validation reports malformed config and implied dependency gaps", fu
                 markdown = true,
             },
         },
+        width_snap_points = { 80, true },
         tools = {
             broken = {
                 cmd = "definitely_missing_sidepanes_validation_cmd",
@@ -1556,6 +1581,7 @@ test("setup validation reports malformed config and implied dependency gaps", fu
     assert(joined:find("Sidepanes dependency missing for document picker: telescope.nvim", 1, true), joined)
     assert(joined:find("Sidepanes dependency missing for markdown headings: Treesitter markdown parser", 1, true), joined)
     assert(joined:find("Sidepanes dependency missing for smart gf: smart_gf", 1, true), joined)
+    assert(joined:find("Invalid Sidepanes width snap point at index 2", 1, true), joined)
     assert(joined:find("Sidepanes tool executable not found for broken", 1, true), joined)
     assert(joined:find("Sidepanes tool has no presets configured: broken", 1, true), joined)
 end)
@@ -2765,6 +2791,42 @@ test("sticky relative width toggle captures and releases current width ratio", f
         pane.refresh_width()
 
         assert(sidepanes.get_width() == 80, "disabled sticky relative width still changed after resize")
+    end)
+end)
+
+test("width snap api moves to configured boundaries and cooperates with sticky relative width", function()
+    reset_pane()
+
+    with_options({ columns = 200, winminwidth = 1 }, function()
+        pane.setup({
+            width = 95,
+            sticky_relative_width = true,
+            width_snap_points = { 80, 100, "1/2", "2/3" },
+        })
+
+        sidepanes.snap_width("next")
+
+        assert(sidepanes.get_width() == 100, "next snap did not move to the next boundary")
+        assert(pane.relative_width and pane.relative_width.ratio == 0.5, "snap did not preserve relative duplicate while sticky")
+
+        vim.o.columns = 160
+        pane.refresh_width()
+
+        assert(sidepanes.get_width() == 80, "sticky snap did not track resized columns")
+
+        sidepanes.snap_width("previous")
+
+        assert(sidepanes.get_width() == 80, "no-op previous snap changed the smallest boundary")
+        assert(pane.relative_width and pane.relative_width.ratio == 0.5, "no-op snap cleared sticky relative target")
+
+        sidepanes.snap_width("next")
+
+        assert(sidepanes.get_width() == 100, "next snap did not move to the absolute boundary")
+        assert(pane.relative_width == nil, "absolute snap did not clear relative target")
+
+        sidepanes.snap_width("previous")
+
+        assert(sidepanes.get_width() == 80, "previous snap did not return to the prior boundary")
     end)
 end)
 

@@ -38,6 +38,11 @@ local pane_mapping_features = {
     gf = "smart_gf",
 }
 
+--- Return whether a width-like value can be parsed by Sidepanes.
+local function valid_width_value(value)
+    return type(value) == "number" or type(value) == "string"
+end
+
 --- Append a warning diagnostic.
 local function warn(diagnostics, message)
     table.insert(diagnostics, {
@@ -134,6 +139,24 @@ local function validate_surface(diagnostics, config)
     validate_mapping_group(diagnostics, "pane", mappings.pane, pane_mapping_features)
 end
 
+--- Validate width snapping config shape.
+local function validate_layout(diagnostics, config)
+    if config.width_snap_points == nil then
+        return
+    end
+
+    if type(config.width_snap_points) ~= "table" then
+        warn(diagnostics, "Sidepanes config width_snap_points must be a table.")
+        return
+    end
+
+    for index, value in ipairs(config.width_snap_points) do
+        if not valid_width_value(value) then
+            warn(diagnostics, "Invalid Sidepanes width snap point at index " .. index .. ": use a number or string.")
+        end
+    end
+end
+
 --- Return the executable head for a tool command.
 local function command_head(tool)
     if not tool then
@@ -191,6 +214,7 @@ function M.diagnostics(config)
     local diagnostics = {}
 
     validate_surface(diagnostics, config or {})
+    validate_layout(diagnostics, config or {})
     validate_tools(diagnostics, config or {})
 
     return diagnostics

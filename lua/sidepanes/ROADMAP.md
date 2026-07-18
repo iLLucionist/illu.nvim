@@ -31,6 +31,7 @@ Recently completed or in progress:
 - `layout.sticky_relative_width` can keep percentage/fraction widths tied to the total Neovim width.
 - `layout.width` accepts the same width units during setup.
 - `toggle_sticky_relative_width()` and `<leader>p%` toggle sticky relative width at runtime.
+- `snap_width(direction)` and `<leader>p-` / `<leader>p+` move to configured width snap points.
 
 ## Roadmap
 
@@ -79,22 +80,17 @@ Completed refinement:
 
 ### 3. Command And Mapping Polish
 
-Status: in progress.
+Status: completed for current width workflow.
 
 Decide whether width changes deserve default mappings or should remain command/API-only.
 
-Possible mappings:
-
-- `<leader>p+` to increase pane width.
-- `<leader>p-` to decrease pane width.
-- A picker or command prompt for exact width values.
-
-Current leaning:
+Completed decisions:
 
 - Keep `:SidepanesWidth` as the primary interface unless repeated manual resizing becomes common.
 - Keep `<leader>p%` as the quick toggle for sticky relative width.
-- Width next/previous mappings should snap to meaningful boundaries instead of adding raw columns.
-- Snapping should understand fractions/percentages and cooperate with `layout.sticky_relative_width`.
+- Use `<leader>p+` and `<leader>p-` for snapping to configured width boundaries.
+- Snapping understands columns, fractions, percentages, and numeric ratios.
+- Snapping cooperates with `layout.sticky_relative_width` by preserving relative snap targets when enabled.
 
 ### 4. Docs Split
 

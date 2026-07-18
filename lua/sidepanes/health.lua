@@ -43,6 +43,8 @@ local expected_global_mappings = {
     clear_ipython = "n",
     focus = "n",
     zoom = "n",
+    width_previous = "n",
+    width_next = "n",
     sticky_relative_width = "n",
     switch = "n",
     ask = "x",
@@ -228,6 +230,36 @@ local function valid_mapping_value(value)
     return value == nil or value == false or type(value) == "string"
 end
 
+--- Return true when a width-like config value has a valid primitive shape.
+local function valid_width_value(value)
+    return type(value) == "number" or type(value) == "string"
+end
+
+--- Report health for width-related layout config.
+local function check_layout(config)
+    start("Layout")
+
+    if not valid_width_value(config.width) then
+        error("Invalid pane width config.", "Use columns, a percentage string, a fraction string, or a numeric ratio.")
+    else
+        ok("Pane width configured: " .. tostring(config.width))
+    end
+
+    if type(config.width_snap_points) ~= "table" then
+        error("Invalid width_snap_points config.", "Use a table of width values.")
+        return
+    end
+
+    for index, value in ipairs(config.width_snap_points) do
+        if not valid_width_value(value) then
+            error("Invalid width snap point at index " .. index, "Use columns, a percentage string, a fraction string, or a numeric ratio.")
+            return
+        end
+    end
+
+    ok("Width snap points configured: " .. tostring(#config.width_snap_points))
+end
+
 --- Report malformed mapping entries for one mapping group.
 local function check_mapping_values(group_name, mappings, expected)
     for _, key in ipairs(expected) do
@@ -370,6 +402,7 @@ function M.check(opts)
 
     start("Sidepanes")
     ok("sidepanes.nvim loaded")
+    check_layout(config)
     check_reflow(config)
     check_dependencies()
     check_tools(config)
