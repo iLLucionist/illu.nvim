@@ -1,6 +1,7 @@
 vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
 local defaults = require("markdown_pane.defaults")
+local document_picker = require("markdown_pane.document_picker")
 local entries = require("markdown_pane.entries")
 local markdown_reflow = require("markdown_reflow")
 local pane = require("markdown_pane")
@@ -129,6 +130,32 @@ test("pane-local slot maps exist on markdown and terminal panes", function()
     for _, lhs in ipairs({ " 0", " x", " c", " i" }) do
         assert(has_map(ctx.bufnr, lhs), lhs .. " missing on terminal pane")
     end
+end)
+
+test("document picker entries preserve display and resolve absolute values", function()
+    reset_pane()
+
+    local root = root_fixture("document-picker-entry-test")
+    local relative = "docs/doc.md"
+    local absolute = root .. "/" .. relative
+
+    write(absolute, { "# Doc" })
+
+    local previous_cwd = vim.fn.getcwd()
+
+    vim.cmd.cd(root)
+
+    local rg_entry = document_picker.rg_entry(relative)
+    local glob_entry = document_picker.glob_entry(absolute)
+
+    vim.cmd.cd(previous_cwd)
+
+    assert(rg_entry.value == absolute, "rg entry did not resolve absolute value")
+    assert(rg_entry.display == relative, "rg entry display changed")
+    assert(rg_entry.ordinal == relative, "rg entry ordinal changed")
+    assert(glob_entry.value == absolute, "glob entry did not resolve absolute value")
+    assert(glob_entry.display == relative, "glob entry display was not cwd-relative")
+    assert(glob_entry.ordinal == absolute, "glob entry ordinal changed")
 end)
 
 test("pane-local slot maps switch between markdown, agents, and IPython", function()

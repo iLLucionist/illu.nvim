@@ -1,4 +1,5 @@
 local defaults = require("markdown_pane.defaults")
+local document_picker = require("markdown_pane.document_picker")
 local entries = require("markdown_pane.entries")
 local heading = require("markdown_pane.heading")
 local maps = require("markdown_pane.maps")
@@ -541,67 +542,7 @@ end
 
 --- Pick a markdown document and open it in the pane.
 function M.pick()
-    local pickers = require("telescope.pickers")
-    local finders = require("telescope.finders")
-    local conf = require("telescope.config").values
-    local actions = require("telescope.actions")
-    local action_state = require("telescope.actions.state")
-    local finder
-
-    if vim.fn.executable("rg") == 1 then
-        finder = finders.new_oneshot_job({
-            "rg",
-            "--files",
-            "-g",
-            "*.md",
-            "-g",
-            "*.markdown",
-        }, {
-            entry_maker = function(entry)
-                local path = util.resolve_path(entry)
-
-                return {
-                    value = path,
-                    display = entry,
-                    ordinal = entry,
-                }
-            end,
-        })
-    else
-        local files = vim.fn.globpath(vim.fn.getcwd(), "**/*.md", false, true)
-
-        vim.list_extend(files, vim.fn.globpath(vim.fn.getcwd(), "**/*.markdown", false, true))
-
-        finder = finders.new_table({
-            results = files,
-            entry_maker = function(entry)
-                return {
-                    value = util.resolve_path(entry),
-                    display = vim.fn.fnamemodify(entry, ":."),
-                    ordinal = entry,
-                }
-            end,
-        })
-    end
-
-    pickers.new({}, {
-        prompt_title = "Markdown Pane",
-        finder = finder,
-        sorter = conf.file_sorter({}),
-        attach_mappings = function(prompt_bufnr)
-            actions.select_default:replace(function()
-                local selection = action_state.get_selected_entry()
-
-                actions.close(prompt_bufnr)
-
-                if selection and selection.value then
-                    M.open(selection.value)
-                end
-            end)
-
-            return true
-        end,
-    }):find()
+    document_picker.pick(M.open)
 end
 
 setup_sticky_heading_autocmds()
