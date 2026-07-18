@@ -197,9 +197,13 @@ local function rest_args(parts)
     return table.concat(rest, " ")
 end
 
---- Notify available subcommands for the root Sidepanes command.
+--- Open Sidepanes help, falling back to a subcommand summary if helptags are unavailable.
 local function show_help()
-    vim.notify("Sidepanes subcommands: " .. table.concat(subcommand_names, ", "), vim.log.levels.INFO)
+    local ok = pcall(vim.cmd.help, "sidepanes")
+
+    if not ok then
+        vim.notify("Sidepanes subcommands: " .. table.concat(subcommand_names, ", "), vim.log.levels.INFO)
+    end
 end
 
 --- Set or report the configured side pane width.

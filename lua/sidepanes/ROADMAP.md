@@ -37,6 +37,8 @@ Recently completed or in progress:
 - Width command aliases cover next, previous, prev, +, -, and pick through both `:SidepanesWidth` and `:Sidepanes width`.
 - Runtime width behavior lives in `lua/sidepanes/width.lua`; `init.lua` delegates width API calls through thin wrappers.
 - The audit smoke test enforces top-level Purpose/Does/Architecture comments for all `lua/sidepanes/*.lua` modules.
+- `doc/sidepanes.txt` provides `:help sidepanes`; `doc/sidepanes.md` carries the longer reference.
+- `:Sidepanes help` opens the Neovim help page, falling back to the subcommand summary if helptags are unavailable.
 
 ## Roadmap
 
@@ -113,19 +115,23 @@ Completed decisions:
 
 ### 4. Docs Split
 
-The README is becoming dense. Split detailed API/config documentation into Neovim-native or plugin-local docs.
+Status: completed.
 
-Options:
+The README was becoming dense, so detailed API/config documentation moved into Neovim-native and plugin-local docs.
+
+Completed docs:
 
 - `doc/sidepanes.txt` for `:help sidepanes`.
-- `docs/sidepanes.md` for longer Markdown documentation.
+- `doc/sidepanes.md` for longer Markdown documentation.
 - Keep README as a quickstart plus links.
+- `:Sidepanes help` opens the help page.
 
 Acceptance:
 
 - Public API is documented.
 - Advanced/unstable API is clearly labeled.
 - Commands, mappings, config, health checks, and examples are discoverable.
+- `:help sidepanes` resolves after helptags are generated.
 
 ### 5. Package Hygiene
 
@@ -133,8 +139,8 @@ Prepare Sidepanes as a proper standalone-ish Neovim plugin surface.
 
 Possible work:
 
-- Add `doc/sidepanes.txt`.
-- Generate helptags-compatible sections.
+- Keep `doc/sidepanes.md` aligned with the help file and README quickstart.
+- Maintain helptags-compatible sections as commands and API evolve.
 - Keep module top-level comments consistent; the audit smoke test now enforces Purpose/Does/Architecture headers.
 - Confirm no personal config assumptions leak into plugin modules.
 - Keep personal `init.lua` as a consumer of the public setup/config surface.
