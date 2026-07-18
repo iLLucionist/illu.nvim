@@ -24,6 +24,7 @@ local default_commands = {
     ipython_clear = "SidepanesIPythonClear",
     focus = "SidepanesFocus",
     zoom = "SidepanesZoom",
+    width = "SidepanesWidth",
     ask = "SidepanesAsk",
     ask_codex = "SidepanesAskCodex",
     ask_claude = "SidepanesAskClaude",
@@ -359,7 +360,7 @@ local function health_config(opts)
         return opts.config
     end
 
-    return require("sidepanes").config
+    return require("sidepanes").get_config()
 end
 
 --- Run Sidepanes health checks.

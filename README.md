@@ -98,6 +98,70 @@ Use `require("sidepanes.config").default_setup()` to inspect the full grouped de
 
 For reusable generated tool tables, use `require("sidepanes.presets").codex(...)` or `require("sidepanes.presets").claude(...)`.
 
+## Public API
+
+`require("sidepanes")` returns the supported facade for config, commands, and mappings. Mutable pane state is intentionally not exposed as top-level fields; use `get_config()` for a defensive copy of normalized config.
+
+Stable public calls include:
+
+- `setup(opts)`, `get_config()`
+- `open(path)`, `toggle(path)`, `close()`, `is_open()`
+- `focus_toggle()`, `toggle_zoom()`, `show_markdown()`
+- `get_width()`, `set_width(value)`, `adjust_width(delta)`, `text_width()`, `toggle_wrap()`
+- `pick()`, `pick_headings()`, `switch_picker()`
+- `switch_to(target, opts)`, `make_switch_entry(target, opts)`
+- `open_terminal(tool_name, preset_name, opts)`
+- `open_ipython(opts)`, `send_ipython(opts)`, `clear_ipython(opts)`, `restart_ipython(opts)`
+- `ask(tool_name, preset_name, opts)`, `ask_picker(opts)`, `ask_last_coding_agent(opts)`, `ask_current_coding_agent(tool_name, opts)`
+- `shutdown_terminals(opts)`
+
+`switch_to(target, opts)` is the stable programmatic switch API. It accepts simple targets:
+
+```lua
+require("sidepanes").switch_to("markdown")
+require("sidepanes").switch_to("codex")
+require("sidepanes").switch_to("claude")
+require("sidepanes").switch_to("ipython")
+require("sidepanes").switch_to("x") -- codex shortcut
+```
+
+For more control, pass a table. Presets may use either the configured preset `name` or `label`:
+
+```lua
+require("sidepanes").switch_to({
+  tool = "codex",
+  preset = "GPT-5.5 / high / fast",
+  root = vim.fn.getcwd(),
+  focus = true,
+})
+```
+
+`make_switch_entry(target, opts)` validates and normalizes the same input into the internal entry consumed by the switcher. It is an advanced helper for integration code that needs to inspect or store a switch target before invoking `switch_to()`.
+
+`show_last_agent(opts)` and `toggle_markdown_agent()` are advanced workflow helpers. They are useful for navigation, but they expose Sidepanes' current runtime memory rather than a durable history model.
+
+`show_last_agent(opts)` shows the most recently remembered pane terminal. If that terminal is still running, it is reused. If it is not running, Sidepanes tries the remembered tool/preset again. If there is no remembered terminal at all, it falls back to Codex with the default Codex preset. Despite the name, this helper follows the latest pane terminal state today, so IPython or a custom terminal can be involved if that was the last terminal used. The Codex/Claude ask helpers remain coding-agent-specific. `opts.focus` controls whether the pane is focused; when omitted, `focus_on_switch` applies.
+
+`toggle_markdown_agent()` switches from Markdown to `show_last_agent({ focus = true })`, and switches from any terminal mode back to the Markdown viewer. That means it behaves like a two-state workflow shortcut, not a terminal history stack: repeated calls alternate between the viewer and whatever Sidepanes currently considers the last terminal. If no terminal has ever been used, the first call from Markdown opens the Codex default.
+
+`switch(entry)` and `ask_with_entry(entry, opts)` are internal and are not exposed on the public facade. Raw `entry` tables are not a stable user contract. Use `switch_to()` for public switching, and use `ask()`, `ask_picker()`, `ask_current_coding_agent()`, or `ask_last_coding_agent()` for public ask flows.
+
+`require("sidepanes.internal")` exists for Sidepanes-owned implementation hooks such as scratch-buffer command mappings. Treat it as private and unstable.
+
+Pane width can be adjusted at runtime:
+
+```lua
+require("sidepanes").set_width(100)    -- columns
+require("sidepanes").set_width("50%")  -- percentage of editor columns
+require("sidepanes").set_width("1/2")  -- screen fraction
+require("sidepanes").adjust_width(10)  -- add columns
+require("sidepanes").adjust_width(-10) -- subtract columns
+```
+
+When the Markdown viewer is active, width changes preserve the viewer cursor/scroll position and reflow/rerender Markdown if automatic reflow is enabled. Terminal panes are resized without Markdown reflow. Zoom still represents a temporary maximum-width mode; `set_width()` changes the normal pane width.
+
+`_state()` is reserved for Sidepanes companion modules and tests. Treat it as internal and unstable.
+
 Set `commands = true` to register the default `:Sidepanes*` commands. Set `mappings.global` to a table to install global mappings. `mappings.pane` customizes buffer-local pane mappings; set an entry to `false` to disable it.
 
 `:Sidepanes` is the discoverable command surface. With no arguments it opens the pane switcher; with completion it exposes subcommands:
@@ -109,8 +173,13 @@ Set `commands = true` to register the default `:Sidepanes*` commands. Set `mappi
 :Sidepanes claude sonnet
 :Sidepanes ipython
 :Sidepanes ask-codex gpt55_high_fast
+:Sidepanes width 100
+:Sidepanes width 50%
+:Sidepanes width +10
 :Sidepanes help
 ```
+
+With commands enabled, `:SidepanesWidth` accepts the same width values as `:Sidepanes width`.
 
 Run `:checkhealth sidepanes` to inspect external commands, optional dependencies, tool presets, command registration, and mapping configuration.
 

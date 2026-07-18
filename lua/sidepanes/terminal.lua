@@ -218,7 +218,12 @@ function M.open(state, deps, tool_name, preset_name, opts)
     return ctx, started
 end
 
---- Show the most recently used coding-agent terminal.
+--- Show the most recently used pane terminal, falling back to Codex when needed.
+---
+--- This follows state.last_terminal_key, so the remembered terminal can be Codex, Claude,
+--- IPython, or a configured custom terminal. If that terminal is still running, it is reused.
+--- If it is not running, Sidepanes opens the remembered tool/preset when available, otherwise
+--- it opens Codex with its default preset. This is a navigation convenience, not an audit log.
 function M.show_last_agent(state, deps, opts)
     opts = opts or {}
 

@@ -1,8 +1,8 @@
 --[[
 sidepanes.init
-Purpose: Expose the public API and shared state for the sidepanes plugin.
+Purpose: Expose the public API while keeping mutable pane state internal.
 Does: Wires together viewer, window, render, switcher, terminal, question, commands, lifecycle, mappings, and picker modules.
-Architecture: Acts as the facade module required by user config; substantial behavior lives in focused submodules to keep responsibilities separated.
+Architecture: Uses an internal state table for focused submodules and returns a smaller facade for user config, commands, and mappings.
 ]]
 
 -- =============================================================================
@@ -11,6 +11,7 @@ Architecture: Acts as the facade module required by user config; substantial beh
 
 
 local defaults = require("sidepanes.defaults")
+local api_helpers = require("sidepanes.api")
 local commands = require("sidepanes.commands")
 local context = require("sidepanes.context")
 local document_picker = require("sidepanes.document_picker")
@@ -32,7 +33,7 @@ local winbar = require("sidepanes.winbar")
 
 
 -- =============================================================================
--- PUBLIC MODULE STATE
+-- INTERNAL MODULE STATE
 -- =============================================================================
 
 
@@ -347,6 +348,61 @@ function M.text_width()
     return pane_text_width()
 end
 
+--- Return the configured normal pane width in columns.
+function M.get_width()
+    return M.config.width
+end
+
+--- Apply a resolved normal pane width and refresh markdown layout if needed.
+local function apply_width(width)
+    M.config.width = width
+
+    if not valid_win(M.winid) then
+        return width
+    end
+
+    if M.active_mode == "markdown" then
+        save_markdown_view()
+    end
+
+    pcall(vim.api.nvim_win_set_width, M.winid, pane_window.width(M))
+    set_window_options(M.winid, M.active_mode == "markdown" and "markdown" or "terminal")
+
+    if M.active_mode == "markdown" and util.valid_buf(M.bufnr) then
+        reflow_pane_buffer(M.bufnr)
+        render_markview(M.bufnr)
+        restore_markdown_view()
+    end
+
+    update_sticky_heading()
+
+    return width
+end
+
+--- Set the normal pane width from columns, a percentage, or a screen fraction.
+function M.set_width(value)
+    local width, err = api_helpers.resolve_width(value, M.config.width)
+
+    if not width then
+        vim.notify(err, vim.log.levels.ERROR)
+        return nil
+    end
+
+    return apply_width(width)
+end
+
+--- Adjust the normal pane width by a column delta.
+function M.adjust_width(delta)
+    local width, err = api_helpers.resolve_width_delta(delta, M.config.width)
+
+    if not width then
+        vim.notify(err, vim.log.levels.ERROR)
+        return nil
+    end
+
+    return apply_width(width)
+end
+
 
 -- =============================================================================
 -- SETUP AND LIFECYCLE API
@@ -412,7 +468,7 @@ end
 
 
 -- =============================================================================
--- CODING-AGENT TERMINAL API
+-- PANE TERMINAL API
 -- =============================================================================
 
 
@@ -421,7 +477,7 @@ function M.open_terminal(tool_name, preset_name, opts)
     return terminal.open(M, terminal_deps(), tool_name, preset_name, opts)
 end
 
---- Show the most recently used coding-agent terminal.
+--- Show the most recently used pane terminal, falling back to Codex.
 function M.show_last_agent(opts)
     terminal.show_last_agent(M, terminal_deps(), opts)
 end
@@ -446,14 +502,49 @@ switcher_deps = function()
     }
 end
 
---- Toggle between markdown view and the last coding-agent terminal.
+--- Toggle between the markdown viewer and the last remembered pane terminal.
 function M.toggle_markdown_agent()
     switcher.toggle_markdown_agent(M, switcher_deps())
 end
 
---- Switch the pane to markdown or a selected terminal entry.
+--- Switch the pane using a raw internal switcher entry.
 function M.switch(entry)
-    switcher.switch(M, switcher_deps(), entry)
+    return switcher.switch(M, switcher_deps(), entry)
+end
+
+--- Build a validated switch entry from a public string or table target.
+---
+--- Examples:
+---   make_switch_entry("markdown")
+---   make_switch_entry("codex")
+---   make_switch_entry("x")
+---   make_switch_entry({ tool = "codex", preset = "gpt55_high_fast", root = vim.fn.getcwd(), focus = true })
+---
+--- The returned entry is normalized for Sidepanes' current switcher internals.
+--- Prefer switch_to() when you only need to switch immediately.
+function M.make_switch_entry(target, opts)
+    local entry, err = api_helpers.make_switch_entry(M, target, opts)
+
+    if not entry then
+        vim.notify(err, vim.log.levels.ERROR)
+        return nil
+    end
+
+    return entry
+end
+
+--- Switch the pane using a stable public target shape.
+---
+--- Accepts strings like "markdown", "codex", "claude", "ipython", "0", "x", "c", and "i",
+--- or a table with fields such as tool, preset, root, bufnr, and focus.
+function M.switch_to(target, opts)
+    local entry = M.make_switch_entry(target, opts)
+
+    if not entry then
+        return nil
+    end
+
+    return switcher.switch(M, switcher_deps(), entry)
 end
 
 --- Show the pane switcher picker.
@@ -543,7 +634,7 @@ function M.change_question_target(bufnr)
     question.change_target(M, bufnr)
 end
 
---- Ask a specific picker entry using a captured or fresh context.
+--- Ask a specific internal picker entry using a captured or fresh context.
 function M.ask_with_entry(entry, opts)
     question.ask_with_entry(M, question_deps(), entry, opts)
 end
@@ -592,4 +683,60 @@ end
 
 setup_sticky_heading_autocmds()
 
-return M
+-- =============================================================================
+-- PUBLIC FACADE
+-- =============================================================================
+
+
+local public = {}
+
+local public_functions = {
+    "setup",
+    "open",
+    "show_markdown",
+    "close",
+    "toggle",
+    "is_open",
+    "focus_toggle",
+    "toggle_zoom",
+    "get_width",
+    "set_width",
+    "adjust_width",
+    "text_width",
+    "toggle_wrap",
+    "open_terminal",
+    "show_last_agent",
+    "toggle_markdown_agent",
+    "switch_to",
+    "make_switch_entry",
+    "switch_picker",
+    "open_ipython",
+    "send_ipython",
+    "clear_ipython",
+    "restart_ipython",
+    "shutdown_terminals",
+    "ask_picker",
+    "ask_last_coding_agent",
+    "ask_current_coding_agent",
+    "ask",
+    "pick",
+    "pick_headings",
+}
+
+for _, name in ipairs(public_functions) do
+    public[name] = function(...)
+        return M[name](...)
+    end
+end
+
+--- Return a defensive copy of the normalized runtime config.
+function public.get_config()
+    return vim.deepcopy(M.config)
+end
+
+--- Return internal mutable state for companion modules and tests.
+function public._state()
+    return M
+end
+
+return public

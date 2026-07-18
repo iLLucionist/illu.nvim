@@ -14,22 +14,22 @@ run_nvim() {
 
 run_nvim sidepanes-regression \
     -u NONE \
-    -S "$ROOT_DIR/tests/sidepanes_regression.lua" \
+    -c "luafile $ROOT_DIR/tests/sidepanes_regression.lua" \
     -c 'qa!'
 
 run_nvim sidepanes-audit-smoke \
     -u "$ROOT_DIR/init.lua" \
-    -S "$ROOT_DIR/tests/sidepanes_audit_smoke.lua" \
+    -c "luafile $ROOT_DIR/tests/sidepanes_audit_smoke.lua" \
     -c 'qa!'
 
 run_nvim sidepanes-checkhealth-smoke \
     -u "$ROOT_DIR/init.lua" \
-    -S "$ROOT_DIR/tests/sidepanes_checkhealth_smoke.lua" \
+    -c "luafile $ROOT_DIR/tests/sidepanes_checkhealth_smoke.lua" \
     -c 'qa!'
 
 run_nvim sidepanes-real-cli-smoke \
     -u NONE \
-    -S "$ROOT_DIR/tests/sidepanes_real_cli_smoke.lua" \
+    -c "luafile $ROOT_DIR/tests/sidepanes_real_cli_smoke.lua" \
     -c 'qa!'
 
 printf '%s\n' 'sidepanes checks passed'

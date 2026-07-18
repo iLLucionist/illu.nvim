@@ -7,7 +7,7 @@ Architecture: Complements the focused regression suite with a full-config smoke 
 
 vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
-local pane = require("sidepanes")
+local sidepanes = require("sidepanes")
 
 local function assert_command(name)
     assert(vim.api.nvim_get_commands({})[name], "missing command: " .. name)
@@ -81,6 +81,7 @@ local expected_commands = {
     "SidepanesIPythonClear",
     "SidepanesFocus",
     "SidepanesZoom",
+    "SidepanesWidth",
     "SidepanesAsk",
     "SidepanesAskCodex",
     "SidepanesAskClaude",
@@ -136,17 +137,19 @@ for _, item in ipairs(expected_maps) do
     assert_global_map(item[1], item[2])
 end
 
-assert(pane.config.width == 100, "configured pane width changed")
-assert(pane.config.zoom_text_width == 90, "configured zoom text width changed")
-assert(pane.config.external_reflow_cmd[1] == "mdfmt", "configured external reflow command changed")
-assert(#pane.config.tools.codex.presets == 12, "configured Codex preset count changed")
-assert(pane.config.tools.codex.presets[1].name == "gpt55_high_fast", "configured Codex default changed")
-assert(#pane.config.tools.claude.presets == 5, "configured Claude preset count changed")
-assert(pane.config.tools.claude.presets[1].name == "sonnet", "configured Claude default changed")
-assert(pane.config.tools.ipython.exit_command == "quit()\r", "configured IPython exit command changed")
+local pane_config = sidepanes.get_config()
+
+assert(pane_config.width == 100, "configured pane width changed")
+assert(pane_config.zoom_text_width == 90, "configured zoom text width changed")
+assert(pane_config.external_reflow_cmd[1] == "mdfmt", "configured external reflow command changed")
+assert(#pane_config.tools.codex.presets == 12, "configured Codex preset count changed")
+assert(pane_config.tools.codex.presets[1].name == "gpt55_high_fast", "configured Codex default changed")
+assert(#pane_config.tools.claude.presets == 5, "configured Claude preset count changed")
+assert(pane_config.tools.claude.presets[1].name == "sonnet", "configured Claude default changed")
+assert(pane_config.tools.ipython.exit_command == "quit()\r", "configured IPython exit command changed")
 
 local reports = capture_health(function()
-    require("sidepanes.health").check({ config = pane.config })
+    require("sidepanes.health").check({ config = pane_config })
 end)
 
 for _, report in ipairs(reports) do

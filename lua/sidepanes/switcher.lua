@@ -1,13 +1,17 @@
 --[[
 sidepanes.switcher
 Purpose: Control switching between markdown, Codex, Claude, IPython, and other pane terminal views.
-Does: Builds switcher entries, toggles markdown versus last coding agent, and dispatches selected entries to viewer or terminal callbacks.
+Does: Builds switcher entries, toggles markdown versus the last remembered terminal, and dispatches selected entries to viewer or terminal callbacks.
 Architecture: Contains pane-mode routing logic while leaving window, terminal, and picker implementation details to injected dependencies.
 ]]
 
 local M = {}
 
---- Toggle between markdown view and the last coding-agent terminal.
+--- Toggle between markdown view and the last remembered pane terminal.
+---
+--- From markdown mode this delegates to show_last_agent({ focus = true }), which may open
+--- or reuse Codex, Claude, IPython, or another configured terminal depending on remembered
+--- runtime state. From any terminal mode it switches back to the markdown viewer.
 function M.toggle_markdown_agent(state, deps)
     if state.active_mode == "markdown" then
         deps.show_last_agent({ focus = true })
@@ -19,17 +23,19 @@ end
 --- Switch the pane to markdown or a selected terminal entry.
 function M.switch(state, deps, entry)
     if entry == "markdown" or (type(entry) == "table" and entry.kind == "markdown") then
-        deps.show_markdown()
-        return
+        return deps.show_markdown()
     end
 
     if type(entry) == "string" then
-        deps.open_terminal(entry)
-        return
+        return deps.open_terminal(entry)
     end
 
     if type(entry) == "table" and entry.kind == "terminal" then
-        deps.open_terminal(entry.tool_name, entry.preset_name, { focus = state.config.focus_on_switch })
+        return deps.open_terminal(entry.tool_name, entry.preset_name, {
+            bufnr = entry.bufnr,
+            focus = entry.focus == nil and state.config.focus_on_switch or entry.focus,
+            root = entry.root,
+        })
     end
 end
 

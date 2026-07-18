@@ -62,7 +62,7 @@ end
 --- Return the best window id for nvim-tree to use when opening a file.
 function M.file_target_picker()
     local ok, sidepanes = pcall(require, "sidepanes")
-    local pane_state = ok and sidepanes or nil
+    local pane_state = ok and sidepanes._state and sidepanes._state() or nil
     local alternate_winid = vim.fn.win_getid(vim.fn.winnr("#"))
     local candidates = {}
 

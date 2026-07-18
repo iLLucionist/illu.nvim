@@ -1,6 +1,7 @@
 vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
 local defaults = require("sidepanes.defaults")
+local api_helpers = require("sidepanes.api")
 local commands = require("sidepanes.commands")
 local config = require("sidepanes.config")
 local dependencies = require("sidepanes.dependencies")
@@ -16,7 +17,8 @@ local presets = require("sidepanes.presets")
 local util = require("sidepanes.util")
 local validation = require("sidepanes.validation")
 local markdown_reflow = require("markdown_reflow")
-local pane = require("sidepanes")
+local sidepanes = require("sidepanes")
+local pane = sidepanes._state()
 
 local tests = {}
 
@@ -204,6 +206,177 @@ local function root_fixture(name)
 
     return root
 end
+
+test("public facade hides mutable state and exposes config copy", function()
+    reset_pane()
+
+    local public_functions = {
+        "setup",
+        "open",
+        "toggle",
+        "close",
+        "is_open",
+        "focus_toggle",
+        "toggle_zoom",
+        "get_width",
+        "set_width",
+        "adjust_width",
+        "show_markdown",
+        "switch_picker",
+        "switch_to",
+        "make_switch_entry",
+        "pick",
+        "pick_headings",
+        "open_terminal",
+        "open_ipython",
+        "send_ipython",
+        "clear_ipython",
+        "restart_ipython",
+        "ask",
+        "ask_picker",
+        "ask_last_coding_agent",
+        "ask_current_coding_agent",
+        "shutdown_terminals",
+        "get_config",
+    }
+    local compatibility_functions = {
+        "show_last_agent",
+        "toggle_markdown_agent",
+        "text_width",
+        "toggle_wrap",
+    }
+    local hidden_fields = {
+        "bufnr",
+        "winid",
+        "source",
+        "markdown_view",
+        "active_mode",
+        "active_terminal_key",
+        "last_focus_win",
+        "terminals",
+        "question_buffers",
+        "zoomed",
+        "config",
+        "switch",
+        "ask_with_entry",
+        "cancel_question",
+        "finish_question",
+        "write_question",
+        "change_question_target",
+    }
+
+    for _, name in ipairs(public_functions) do
+        assert(type(sidepanes[name]) == "function", "missing public function: " .. name)
+    end
+
+    for _, name in ipairs(compatibility_functions) do
+        assert(type(sidepanes[name]) == "function", "missing compatibility facade function: " .. name)
+    end
+
+    for _, name in ipairs(hidden_fields) do
+        assert(sidepanes[name] == nil, "mutable state leaked through public facade: " .. name)
+    end
+
+    local internal = require("sidepanes.internal")
+
+    for _, name in ipairs({ "switch", "ask_with_entry", "cancel_question", "finish_question", "write_question", "change_question_target" }) do
+        assert(type(internal[name]) == "function", "missing internal function: " .. name)
+    end
+
+    local first = sidepanes.get_config()
+
+    first.width = 999
+    first.tools.codex.presets[1].name = "mutated"
+
+    local second = sidepanes.get_config()
+
+    assert(second.width == defaults.config.width, "get_config returned mutable config table")
+    assert(second.tools.codex.presets[1].name == defaults.config.tools.codex.presets[1].name, "get_config returned nested mutable config")
+    assert(sidepanes._state() == pane, "internal state escape hatch changed identity")
+    assert(sidepanes.text_width() == pane.text_width(), "facade did not delegate text_width")
+end)
+
+test("public switch entry helper normalizes strings, maps, and aliases", function()
+    reset_pane()
+
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = {
+                    { name = "default", label = "Default", args = {} },
+                    { name = "review", label = "Review", args = {} },
+                },
+            },
+            ipython = {
+                label = "IPython",
+                ask = false,
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    local markdown_entry = sidepanes.make_switch_entry("markdown")
+    local shortcut_entry = sidepanes.make_switch_entry("x")
+    local uppercase_entry = sidepanes.make_switch_entry("Codex")
+    local table_entry = sidepanes.make_switch_entry({
+        tool = "codex",
+        preset = "Review",
+        root = "/private/tmp/illu-switch-entry-root",
+        focus = false,
+    })
+    local ipython_entry = sidepanes.make_switch_entry({ target = "i" })
+
+    assert(markdown_entry.kind == "markdown", "markdown string did not normalize")
+    assert(shortcut_entry.tool_name == "codex", "x alias did not normalize to codex")
+    assert(uppercase_entry.tool_name == "codex", "Codex target did not normalize to codex")
+    assert(table_entry.tool_name == "codex", "table tool did not normalize")
+    assert(table_entry.preset_name == "review", "preset label did not normalize to preset name")
+    assert(table_entry.root == "/private/tmp/illu-switch-entry-root", "switch entry lost root")
+    assert(table_entry.focus == false, "switch entry lost focus override")
+    assert(ipython_entry.tool_name == "ipython", "i alias did not normalize to ipython")
+
+    local messages = capture_notify(function()
+        assert(sidepanes.make_switch_entry({ tool = "codex", preset = "missing" }) == nil, "invalid preset returned an entry")
+        assert(sidepanes.make_switch_entry("missing-tool") == nil, "invalid target returned an entry")
+    end)
+
+    assert(has_notify(messages, "Unknown Codex preset"), "invalid preset did not notify")
+    assert(has_notify(messages, "Unknown pane target"), "invalid target did not notify")
+end)
+
+test("width parser accepts columns percentages fractions and deltas", function()
+    local old_columns = vim.o.columns
+    local old_winminwidth = vim.o.winminwidth
+
+    vim.o.columns = 120
+    vim.o.winminwidth = 1
+
+    local columns = assert(api_helpers.resolve_width(80, 100))
+    local string_columns = assert(api_helpers.resolve_width("70", 100))
+    local percent = assert(api_helpers.resolve_width("50%", 100))
+    local fraction = assert(api_helpers.resolve_width("1/3", 100))
+    local numeric_fraction = assert(api_helpers.resolve_width(0.5, 100))
+    local plus_delta = assert(api_helpers.resolve_width("+10", 80))
+    local minus_delta = assert(api_helpers.resolve_width_delta("-5", 80))
+    local numeric_delta = assert(api_helpers.resolve_width_delta(7, 80))
+    local bad_width, bad_err = api_helpers.resolve_width("wide", 80)
+
+    vim.o.columns = old_columns
+    vim.o.winminwidth = old_winminwidth
+
+    assert(columns == 80, "column width parsed incorrectly")
+    assert(string_columns == 70, "string column width parsed incorrectly")
+    assert(percent == 60, "percentage width parsed incorrectly")
+    assert(fraction == 40, "fraction width parsed incorrectly")
+    assert(numeric_fraction == 60, "numeric fraction width parsed incorrectly")
+    assert(plus_delta == 90, "relative set width parsed incorrectly")
+    assert(minus_delta == 75, "negative width delta parsed incorrectly")
+    assert(numeric_delta == 87, "numeric width delta parsed incorrectly")
+    assert(bad_width == nil and bad_err:find("Could not parse pane width", 1, true), "bad width did not return parse error")
+end)
 
 test("pane-local slot maps exist on markdown and terminal panes", function()
     reset_pane()
@@ -488,6 +661,16 @@ test("command registration invokes facade callbacks", function()
         toggle_zoom = function()
             calls.zoom = true
         end,
+        get_width = function()
+            calls.get_width = true
+            return 91
+        end,
+        set_width = function(value)
+            calls.set_width = value
+        end,
+        adjust_width = function(value)
+            calls.adjust_width = value
+        end,
         ask_picker = function(opts)
             calls.ask = opts
         end,
@@ -507,6 +690,7 @@ test("command registration invokes facade callbacks", function()
         ipython_clear = "SidepanesTestIPythonClear",
         focus = "SidepanesTestFocus",
         zoom = "SidepanesTestZoom",
+        width = "SidepanesTestWidth",
         ask = "SidepanesTestAsk",
         ask_codex = "SidepanesTestAskCodex",
         ask_claude = "SidepanesTestAskClaude",
@@ -539,6 +723,14 @@ test("command registration invokes facade callbacks", function()
     assert(calls.focus == true, "focus command did not call focus toggle")
     vim.cmd("SidepanesTestZoom")
     assert(calls.zoom == true, "zoom command did not call zoom toggle")
+    vim.cmd("SidepanesTestWidth 45%")
+    assert(calls.set_width == "45%", "width command did not forward absolute width")
+    vim.cmd("SidepanesTestWidth +5")
+    assert(calls.adjust_width == "+5", "width command did not forward relative width")
+    capture_notify(function()
+        vim.cmd("SidepanesTestWidth")
+    end)
+    assert(calls.get_width == true, "width command without args did not report width")
     vim.cmd("2,4SidepanesTestAsk")
     assert(calls.ask.bufnr == bufnr and calls.ask.line1 == 2 and calls.ask.line2 == 4, "ask command did not forward range")
     vim.cmd("3,5SidepanesTestAskCodex gpt55_high_fast")
@@ -593,6 +785,16 @@ test("root command dispatches subcommands and completes choices", function()
         end,
         toggle_zoom = function()
             calls.zoom = true
+        end,
+        get_width = function()
+            calls.get_width = true
+            return 88
+        end,
+        set_width = function(value)
+            calls.set_width = value
+        end,
+        adjust_width = function(value)
+            calls.adjust_width = value
         end,
         ask_picker = function(opts)
             calls.ask = opts
@@ -657,6 +859,14 @@ test("root command dispatches subcommands and completes choices", function()
     assert(calls.focus == true, "root focus subcommand did not call focus toggle")
     vim.cmd("SidepanesRootTest zoom")
     assert(calls.zoom == true, "root zoom subcommand did not call zoom toggle")
+    vim.cmd("SidepanesRootTest width 1/2")
+    assert(calls.set_width == "1/2", "root width subcommand did not forward absolute width")
+    vim.cmd("SidepanesRootTest width -4")
+    assert(calls.adjust_width == "-4", "root width subcommand did not forward relative width")
+    capture_notify(function()
+        vim.cmd("SidepanesRootTest width")
+    end)
+    assert(calls.get_width == true, "root width subcommand without args did not report width")
     vim.cmd("2,4SidepanesRootTest ask")
     assert(calls.ask.bufnr == bufnr and calls.ask.line1 == 2 and calls.ask.line2 == 4, "root ask subcommand did not forward range")
     vim.cmd("3,5SidepanesRootTest ask-codex gpt55_high_fast")
@@ -691,6 +901,9 @@ test("default command names use Sidepanes prefix", function()
         clear_ipython = function() end,
         focus_toggle = function() end,
         toggle_zoom = function() end,
+        get_width = function() end,
+        set_width = function() end,
+        adjust_width = function() end,
         ask_picker = function() end,
         ask = function() end,
     }
@@ -712,6 +925,7 @@ test("default command names use Sidepanes prefix", function()
         "SidepanesIPythonClear",
         "SidepanesFocus",
         "SidepanesZoom",
+        "SidepanesWidth",
         "SidepanesAsk",
         "SidepanesAskCodex",
         "SidepanesAskClaude",
@@ -726,6 +940,7 @@ test("default command names use Sidepanes prefix", function()
         "PaneIPythonClear",
         "PaneFocus",
         "PaneZoom",
+        "PaneWidth",
         "PaneAsk",
         "PaneAskCodex",
         "PaneAskClaude",
@@ -1555,6 +1770,53 @@ test("pane switch accepts string and terminal entry targets", function()
     assert(ctx.requested_preset and ctx.requested_preset.name == "review", "terminal entry switch did not request preset")
 end)
 
+test("public switch_to accepts strings, maps, roots, and aliases", function()
+    reset_pane()
+
+    local root = root_fixture("public-switch-to-test")
+
+    write(root .. "/docs/doc.md", { "# Doc" })
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = {
+                    { name = "default", label = "Default", args = {} },
+                    { name = "review", label = "Review", args = {} },
+                },
+            },
+            ipython = {
+                label = "IPython",
+                ask = false,
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+    pane.open(root .. "/docs/doc.md")
+
+    local codex_ctx = sidepanes.switch_to({
+        tool = "codex",
+        preset = "review",
+        root = root,
+        focus = true,
+    })
+
+    assert(codex_ctx and codex_ctx.tool_name == "codex", "switch_to table did not open Codex")
+    assert(codex_ctx.requested_preset and codex_ctx.requested_preset.name == "review", "switch_to table did not request preset")
+    assert(pane.active_mode == "codex", "switch_to table did not set active Codex mode")
+    assert(vim.api.nvim_get_current_win() == pane.winid, "switch_to focus override did not focus pane")
+
+    sidepanes.switch_to("0")
+    assert(pane.active_mode == "markdown", "switch_to 0 did not restore markdown")
+
+    local ipython_ctx = sidepanes.switch_to("i", { root = root, focus = false })
+
+    assert(ipython_ctx and ipython_ctx.tool_name == "ipython", "switch_to i did not open IPython")
+    assert(pane.active_mode == "ipython", "switch_to i did not set active IPython mode")
+end)
+
 test("pane switch picker selects markdown and shortcut entries without enter", function()
     reset_pane()
 
@@ -1587,10 +1849,10 @@ test("pane switch picker selects markdown and shortcut entries without enter", f
     assert(vim.api.nvim_win_get_buf(pane.winid) == pane.bufnr, "picker 0 did not restore markdown buffer")
 end)
 
-test("toggle markdown agent flips between markdown and last coding agent", function()
+test("show last agent falls back to Codex when no terminal was remembered", function()
     reset_pane()
 
-    local root = root_fixture("toggle-agent-test")
+    local root = root_fixture("last-agent-fallback-test")
 
     write(root .. "/docs/doc.md", { "# Doc" })
     pane.setup({
@@ -1603,11 +1865,41 @@ test("toggle markdown agent flips between markdown and last coding agent", funct
         },
     })
     pane.open(root .. "/docs/doc.md")
+
+    pane.show_last_agent({ root = root, focus = true })
+
+    assert(pane.active_mode == "codex", "show_last_agent did not fall back to Codex")
+    assert(vim.api.nvim_get_current_win() == pane.winid, "show_last_agent focus option did not focus pane")
+end)
+
+test("toggle markdown agent flips between markdown and last remembered terminal", function()
+    reset_pane()
+
+    local root = root_fixture("toggle-agent-test")
+
+    write(root .. "/docs/doc.md", { "# Doc" })
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+            ipython = {
+                label = "IPython",
+                ask = false,
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+    pane.open(root .. "/docs/doc.md")
     pane.open_terminal("codex", nil, { root = root, focus = true })
+    pane.open_terminal("ipython", nil, { root = root, focus = true })
     pane.show_markdown()
 
     pane.toggle_markdown_agent()
-    assert(pane.active_mode == "codex", "toggle did not return to last coding agent")
+    assert(pane.active_mode == "ipython", "toggle did not return to last remembered terminal")
 
     pane.toggle_markdown_agent()
     assert(pane.active_mode == "markdown", "toggle did not return to markdown")
@@ -1810,15 +2102,66 @@ test("question write then quit sends prompt and focuses terminal", function()
     pane.ask("codex", nil, { bufnr = vim.api.nvim_get_current_buf() })
 
     local qbuf = only_question_buf()
+    local internal = require("sidepanes.internal")
 
     set_question(qbuf, { "Question:", "send this exact prompt" })
-    pane.write_question(qbuf)
-    pane.finish_question(qbuf)
+    internal.write_question(qbuf)
+    internal.finish_question(qbuf)
 
     wait_for_file(out, "send this exact prompt")
     assert(next(pane.question_buffers) == nil, "sent question buffer was not cleared")
     assert(vim.api.nvim_get_current_win() == pane.winid, "send did not focus the pane terminal")
     assert(pane.active_mode == "codex", "send did not activate Codex")
+end)
+
+test("question command-line mapping calls internal lifecycle callbacks", function()
+    reset_pane()
+
+    local root = root_fixture("question-commandline-internal-test")
+
+    write(root .. "/src/origin.py", { "print('origin')" })
+
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                send_delay_ms = 0,
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    vim.cmd.edit(root .. "/src/origin.py")
+    pane.ask("codex", nil, { bufnr = vim.api.nvim_get_current_buf() })
+
+    local qbuf = only_question_buf()
+    local enter_map = find_map(qbuf, "<CR>", "c")
+    local original_getcmdline = vim.fn.getcmdline
+
+    assert(enter_map.callback, "question command-line enter map has no callback")
+
+    vim.fn.getcmdline = function()
+        return "wq"
+    end
+
+    local write_and_quit = enter_map.callback()
+
+    vim.fn.getcmdline = function()
+        return "q"
+    end
+
+    local quit = enter_map.callback()
+
+    vim.fn.getcmdline = original_getcmdline
+
+    assert(write_and_quit:find('require%("sidepanes%.internal"%)%.write_question', 1, false), write_and_quit)
+    assert(write_and_quit:find('require%("sidepanes%.internal"%)%.finish_question', 1, false), write_and_quit)
+    assert(quit:find('require%("sidepanes%.internal"%)%.finish_question', 1, false), quit)
+    assert(not write_and_quit:find('require%("sidepanes"%)%.write_question', 1, false), write_and_quit)
+    assert(not quit:find('require%("sidepanes"%)%.finish_question', 1, false), quit)
+
+    pane.finish_question(qbuf)
 end)
 
 test("question write without quit does not send", function()
@@ -2211,6 +2554,64 @@ test("zoom focuses pane and caps markdown text width", function()
 
     assert(vim.api.nvim_get_current_win() == pane.winid, "zoom did not focus pane")
     assert(pane.text_width() <= 90, "zoom text width exceeded cap")
+end)
+
+test("public width api resizes pane and reflows only markdown", function()
+    reset_pane()
+
+    local old_columns = vim.o.columns
+    local old_winminwidth = vim.o.winminwidth
+    local root = root_fixture("pane-width-api-test")
+
+    vim.o.columns = 140
+    vim.o.winminwidth = 1
+
+    write(root .. "/docs/doc.md", {
+        "# Doc",
+        "",
+        "This paragraph should fit as a single line when the pane starts wide but should wrap into multiple shorter lines after the public width API narrows the pane.",
+    })
+
+    pane.setup({
+        width = 100,
+        reflow_margin = 4,
+        auto_reflow = true,
+        external_reflow_cmd = false,
+        tools = {
+            ipython = {
+                label = "IPython",
+                ask = false,
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+    pane.open(root .. "/docs/doc.md")
+
+    local initial_line_count = vim.api.nvim_buf_line_count(pane.bufnr)
+    local width = sidepanes.set_width("50%")
+
+    assert(width == 70, "percentage width did not resolve against screen columns")
+    assert(sidepanes.get_width() == 70, "get_width did not return configured width")
+    assert(vim.api.nvim_win_get_width(pane.winid) == 70, "set_width did not resize open pane")
+
+    sidepanes.adjust_width("-30")
+
+    assert(sidepanes.get_width() == 40, "adjust_width did not update configured width")
+    assert(vim.api.nvim_win_get_width(pane.winid) == 40, "adjust_width did not resize open pane")
+    assert(vim.api.nvim_buf_line_count(pane.bufnr) > initial_line_count, "narrowing Sidepanes viewer did not reflow")
+
+    local markdown_lines_after_reflow = vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false)
+
+    pane.open_terminal("ipython", nil, { root = root, focus = true })
+    sidepanes.set_width("1/2")
+
+    assert(pane.active_mode == "ipython", "width change left terminal mode")
+    assert(vim.api.nvim_win_get_width(pane.winid) == 70, "fraction width did not resize terminal pane")
+    assert(vim.deep_equal(vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false), markdown_lines_after_reflow), "terminal width change reflowed markdown buffer")
+
+    vim.o.columns = old_columns
+    vim.o.winminwidth = old_winminwidth
 end)
 
 test("external mdfmt reflow preserves markdown tables", function()

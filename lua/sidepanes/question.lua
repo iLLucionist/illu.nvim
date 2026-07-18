@@ -255,7 +255,7 @@ local function open_buffer(state, deps, entry, context, origin)
 
         if line == "q" or line == "q!" or line == "quit" or line == "quit!" then
             return vim.api.nvim_replace_termcodes(
-                '<C-u>lua require("sidepanes").finish_question(' .. scratch .. ')<CR>',
+                '<C-u>lua require("sidepanes.internal").finish_question(' .. scratch .. ')<CR>',
                 true,
                 false,
                 true
@@ -264,7 +264,7 @@ local function open_buffer(state, deps, entry, context, origin)
 
         if line == "wq" or line == "wq!" or line == "x" or line == "xit" or line == "exit" then
             return vim.api.nvim_replace_termcodes(
-                '<C-u>lua require("sidepanes").write_question(' .. scratch .. '); require("sidepanes").finish_question(' .. scratch .. ')<CR>',
+                '<C-u>lua require("sidepanes.internal").write_question(' .. scratch .. '); require("sidepanes.internal").finish_question(' .. scratch .. ')<CR>',
                 true,
                 false,
                 true

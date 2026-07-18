@@ -1,7 +1,8 @@
 vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
 local defaults = require("sidepanes.defaults")
-local pane = require("sidepanes")
+local sidepanes = require("sidepanes")
+local pane = sidepanes._state()
 local util = require("sidepanes.util")
 
 local root = "/private/tmp/illu-real-cli-smoke"

@@ -28,11 +28,13 @@ local function current_context()
     local is_pane = false
     local terminal_ctx = nil
 
-    if ok and valid_buf(sidepanes.bufnr) and bufnr == sidepanes.bufnr and sidepanes.source then
-        path = sidepanes.source
+    local sidepanes_state = ok and sidepanes._state and sidepanes._state() or nil
+
+    if sidepanes_state and valid_buf(sidepanes_state.bufnr) and bufnr == sidepanes_state.bufnr and sidepanes_state.source then
+        path = sidepanes_state.source
         is_pane = true
-    elseif ok then
-        for _, ctx in pairs(sidepanes.terminals or {}) do
+    elseif sidepanes_state then
+        for _, ctx in pairs(sidepanes_state.terminals or {}) do
             if valid_buf(ctx.bufnr) and bufnr == ctx.bufnr then
                 terminal_ctx = ctx
                 path = ctx.root
@@ -72,7 +74,7 @@ local function current_context()
         root = root,
         is_pane = is_pane,
         terminal_ctx = terminal_ctx,
-        sidepanes = ok and sidepanes or nil,
+        sidepanes = sidepanes_state,
     }
 end
 
