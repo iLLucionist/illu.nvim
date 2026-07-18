@@ -739,6 +739,15 @@ local function terminal_entries(root, start_index, opts)
     return entries.terminal_entries(M, root, start_index, opts)
 end
 
+--- Capture text, file, root, and snippet language for a send/ask action.
+local function selection_context(opts)
+    return selection.context(opts, {
+        pane_bufnr = M.bufnr,
+        source = M.source,
+        terminal_context_for_buf = terminal_context_for_buf,
+    })
+end
+
 --- Build terminal module callbacks that still belong to pane/window state.
 local function terminal_deps()
     return {
@@ -809,15 +818,6 @@ function M.switch_picker()
             M.switch(choice)
         end
     end)
-end
-
---- Capture text, file, root, and snippet language for a send/ask action.
-local function selection_context(opts)
-    return selection.context(opts, {
-        pane_bufnr = M.bufnr,
-        source = M.source,
-        terminal_context_for_buf = terminal_context_for_buf,
-    })
 end
 
 --- Send an ask prompt, switching model first when needed.

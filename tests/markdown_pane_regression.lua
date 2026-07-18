@@ -177,6 +177,42 @@ test("pane-local slot maps switch between markdown, agents, and IPython", functi
     assert(vim.api.nvim_win_get_buf(pane.winid) == pane.bufnr, "space-0 did not restore markdown buffer")
 end)
 
+test("public IPython send captures current line through terminal deps", function()
+    reset_pane()
+
+    local root = root_fixture("ipython-send-test")
+    local out = "/private/tmp/illu-ipython-send.txt"
+
+    pcall(vim.fn.delete, out)
+    write(root .. "/src/origin.py", {
+        "value = 41 + 1",
+        "print(value)",
+    })
+
+    pane.setup({
+        tools = {
+            ipython = {
+                label = "IPython",
+                ask = false,
+                cmd = { "sh", "-c", "tee -a " .. out },
+                send_delay_ms = 0,
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    vim.cmd.edit(root .. "/src/origin.py")
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+    pane.send_ipython({
+        bufnr = vim.api.nvim_get_current_buf(),
+        line1 = 1,
+        line2 = 1,
+    })
+
+    wait_for_file(out, "value = 41 + 1")
+end)
+
 test("visual-line ask captures all selected lines", function()
     reset_pane()
 
