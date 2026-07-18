@@ -11,6 +11,7 @@ local util = require("sidepanes.util")
 local M = {}
 
 local known_commands = {
+    root = true,
     toggle = true,
     pick = true,
     headings = true,

@@ -366,22 +366,33 @@ local sidepanes = require("sidepanes")
 local markdown_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" }
 
 sidepanes.setup({
-    width = 100,
-    wrap = false,
-    auto_reflow = true,
-    external_reflow_cmd = markdown_reflow_cmd,
-    external_reflow_fallback = true,
-    external_reflow_protect_tables = true,
-    reflow_margin = 8,
-    zoom_text_width = 90,
-    sticky_heading = true,
-    wrap_toggle_key = "<leader>mw",
-    focus_on_switch = true,
-    focus_on_ask = true,
-    shutdown_on_exit = true,
-    shutdown_timeout_ms = 300,
-    validate = true,
+    layout = {
+        width = 100,
+        zoom_text_width = 90,
+    },
+    markdown = {
+        wrap = false,
+        wrap_toggle_key = "<leader>mw",
+        sticky_heading = true,
+        reflow = {
+            enabled = true,
+            cmd = markdown_reflow_cmd,
+            fallback = true,
+            protect_tables = true,
+            margin = 8,
+        },
+    },
+    lifecycle = {
+        focus_on_switch = true,
+        focus_on_ask = true,
+        shutdown_on_exit = true,
+        shutdown_timeout_ms = 300,
+    },
+    validation = {
+        enabled = true,
+    },
     commands = {
+        root = "Sidepanes",
         toggle = "SidepanesToggle",
         pick = "SidepanesPick",
         headings = "SidepanesHeadings",

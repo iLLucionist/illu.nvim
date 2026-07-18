@@ -11,6 +11,7 @@ local dependencies = require("sidepanes.dependencies")
 local M = {}
 
 local default_commands = {
+    root = "Sidepanes",
     toggle = "SidepanesToggle",
     pick = "SidepanesPick",
     headings = "SidepanesHeadings",
@@ -151,7 +152,7 @@ local function check_reflow(config)
     else
         local level = config.external_reflow_fallback == false and error or warn
 
-        level("External reflow command not found: " .. cmd, "Install it or update external_reflow_cmd.")
+        level("External reflow command not found: " .. cmd, "Install it or update markdown.reflow.cmd.")
     end
 
     if config.external_reflow_protect_tables then

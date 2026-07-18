@@ -535,6 +535,134 @@ test("command registration invokes facade callbacks", function()
     assert(calls.ask_tool.opts.line1 == 6 and calls.ask_tool.opts.line2 == 7, "ask claude command did not forward range")
 end)
 
+test("root command dispatches subcommands and completes choices", function()
+    local calls = {}
+    local bufnr = vim.api.nvim_get_current_buf()
+
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "1", "2", "3", "4", "5", "6", "7" })
+
+    commands.setup({
+        toggle = function(path)
+            calls.toggle = path
+        end,
+        open = function(path)
+            calls.open = path
+        end,
+        show_markdown = function()
+            calls.markdown = true
+        end,
+        pick = function()
+            calls.pick = true
+        end,
+        pick_headings = function()
+            calls.headings = true
+        end,
+        switch_picker = function()
+            calls.switch = true
+        end,
+        open_terminal = function(tool_name, preset_name)
+            calls.open_terminal = { tool_name = tool_name, preset_name = preset_name }
+        end,
+        open_ipython = function(opts)
+            calls.open_ipython = opts
+        end,
+        restart_ipython = function(opts)
+            calls.restart_ipython = opts
+        end,
+        clear_ipython = function(opts)
+            calls.clear_ipython = opts
+        end,
+        focus_toggle = function()
+            calls.focus = true
+        end,
+        toggle_zoom = function()
+            calls.zoom = true
+        end,
+        ask_picker = function(opts)
+            calls.ask = opts
+        end,
+        ask = function(tool_name, preset_name, opts)
+            calls.ask_tool = { tool_name = tool_name, preset_name = preset_name, opts = opts }
+        end,
+        config = {
+            tools = {
+                codex = {
+                    presets = {
+                        { name = "gpt55_high_fast" },
+                    },
+                },
+                claude = {
+                    presets = {
+                        { name = "sonnet" },
+                    },
+                },
+                ipython = {
+                    presets = {
+                        { name = "default" },
+                    },
+                },
+            },
+        },
+    }, {
+        root = "SidepanesRootTest",
+    })
+
+    vim.cmd("SidepanesRootTest")
+    assert(calls.switch == true, "root command without subcommand did not open switcher")
+    calls.switch = false
+    vim.cmd("SidepanesRootTest markdown")
+    assert(calls.markdown == true, "root markdown subcommand did not show markdown")
+    vim.cmd("SidepanesRootTest toggle docs/root.md")
+    assert(calls.toggle == "docs/root.md", "root toggle subcommand did not forward path")
+    vim.cmd("SidepanesRootTest open docs/open.md")
+    assert(calls.open == "docs/open.md", "root open subcommand did not forward path")
+    vim.cmd("SidepanesRootTest pick")
+    assert(calls.pick == true, "root pick subcommand did not call pick")
+    vim.cmd("SidepanesRootTest headings")
+    assert(calls.headings == true, "root headings subcommand did not call pick_headings")
+    vim.cmd("SidepanesRootTest switch")
+    assert(calls.switch == true, "root switch subcommand did not call switch picker")
+    vim.cmd("SidepanesRootTest tool codex gpt55_high_fast")
+    assert(calls.open_terminal.tool_name == "codex", "root tool subcommand did not forward tool")
+    assert(calls.open_terminal.preset_name == "gpt55_high_fast", "root tool subcommand did not forward preset")
+    vim.cmd("SidepanesRootTest codex gpt55_high_fast")
+    assert(calls.open_terminal.tool_name == "codex", "root codex subcommand used wrong tool")
+    assert(calls.open_terminal.preset_name == "gpt55_high_fast", "root codex subcommand did not forward preset")
+    vim.cmd("SidepanesRootTest claude sonnet")
+    assert(calls.open_terminal.tool_name == "claude", "root claude subcommand used wrong tool")
+    assert(calls.open_terminal.preset_name == "sonnet", "root claude subcommand did not forward preset")
+    vim.cmd("SidepanesRootTest ipython")
+    assert(calls.open_ipython.bufnr == bufnr and calls.open_ipython.focus == true, "root ipython subcommand did not use current buffer")
+    vim.cmd("SidepanesRootTest ipython-restart")
+    assert(calls.restart_ipython.bufnr == bufnr and calls.restart_ipython.focus == true, "root ipython-restart subcommand did not use current buffer")
+    vim.cmd("SidepanesRootTest ipython-clear")
+    assert(calls.clear_ipython.bufnr == bufnr, "root ipython-clear subcommand did not use current buffer")
+    vim.cmd("SidepanesRootTest focus")
+    assert(calls.focus == true, "root focus subcommand did not call focus toggle")
+    vim.cmd("SidepanesRootTest zoom")
+    assert(calls.zoom == true, "root zoom subcommand did not call zoom toggle")
+    vim.cmd("2,4SidepanesRootTest ask")
+    assert(calls.ask.bufnr == bufnr and calls.ask.line1 == 2 and calls.ask.line2 == 4, "root ask subcommand did not forward range")
+    vim.cmd("3,5SidepanesRootTest ask-codex gpt55_high_fast")
+    assert(calls.ask_tool.tool_name == "codex", "root ask-codex subcommand used wrong tool")
+    assert(calls.ask_tool.preset_name == "gpt55_high_fast", "root ask-codex subcommand did not forward preset")
+    assert(calls.ask_tool.opts.line1 == 3 and calls.ask_tool.opts.line2 == 5, "root ask-codex subcommand did not forward range")
+    vim.cmd("6,7SidepanesRootTest ask-claude sonnet")
+    assert(calls.ask_tool.tool_name == "claude", "root ask-claude subcommand used wrong tool")
+    assert(calls.ask_tool.preset_name == "sonnet", "root ask-claude subcommand did not forward preset")
+    assert(calls.ask_tool.opts.line1 == 6 and calls.ask_tool.opts.line2 == 7, "root ask-claude subcommand did not forward range")
+
+    local subcommands = vim.fn.getcompletion("SidepanesRootTest co", "cmdline")
+    local tool_names = vim.fn.getcompletion("SidepanesRootTest tool c", "cmdline")
+    local codex_presets = vim.fn.getcompletion("SidepanesRootTest codex g", "cmdline")
+    local claude_presets = vim.fn.getcompletion("SidepanesRootTest claude s", "cmdline")
+
+    assert(vim.tbl_contains(subcommands, "codex"), "root completion did not include codex")
+    assert(vim.tbl_contains(tool_names, "codex"), "root tool completion did not include codex")
+    assert(vim.tbl_contains(codex_presets, "gpt55_high_fast"), "root codex completion did not include preset")
+    assert(vim.tbl_contains(claude_presets, "sonnet"), "root claude completion did not include preset")
+end)
+
 test("default command names use Sidepanes prefix", function()
     local api = {
         toggle = function() end,
@@ -555,6 +683,7 @@ test("default command names use Sidepanes prefix", function()
 
     local command_table = vim.api.nvim_get_commands({})
     local expected = {
+        "Sidepanes",
         "SidepanesToggle",
         "SidepanesPick",
         "SidepanesHeadings",
@@ -720,8 +849,14 @@ test("config normalizes ergonomic markdown and tool setup", function()
     reset_pane()
 
     pane.setup({
+        layout = {
+            width = 88,
+            zoom_text_width = 77,
+        },
         markdown = {
             wrap = true,
+            wrap_toggle_key = "<leader>tw",
+            sticky_heading = false,
             reflow = {
                 enabled = false,
                 cmd = { "mdfmt", "--stdin", "--width", "{width}" },
@@ -740,21 +875,97 @@ test("config normalizes ergonomic markdown and tool setup", function()
             },
             claude = false,
         },
+        lifecycle = {
+            focus_on_switch = false,
+            focus_on_ask = false,
+            shutdown_on_exit = false,
+            shutdown_timeout_ms = 123,
+        },
+        validation = {
+            enabled = false,
+        },
     })
 
+    assert(pane.config.layout == nil, "ergonomic layout table leaked into runtime config")
     assert(pane.config.markdown == nil, "ergonomic markdown table leaked into runtime config")
+    assert(pane.config.lifecycle == nil, "ergonomic lifecycle table leaked into runtime config")
+    assert(pane.config.validation == nil, "ergonomic validation table leaked into runtime config")
+    assert(pane.config.width == 88, "layout.width did not map to width")
+    assert(pane.config.zoom_text_width == 77, "layout.zoom_text_width did not map to zoom_text_width")
     assert(pane.config.wrap == true, "markdown.wrap did not map to wrap")
+    assert(pane.config.wrap_toggle_key == "<leader>tw", "markdown.wrap_toggle_key did not map to wrap_toggle_key")
+    assert(pane.config.sticky_heading == false, "markdown.sticky_heading did not map to sticky_heading")
     assert(pane.config.auto_reflow == false, "markdown.reflow.enabled did not map to auto_reflow")
     assert(pane.config.external_reflow_cmd[1] == "mdfmt", "markdown.reflow.cmd did not map to external_reflow_cmd")
     assert(pane.config.external_reflow_fallback == false, "markdown.reflow.fallback did not map to external_reflow_fallback")
     assert(pane.config.external_reflow_protect_tables == false, "markdown.reflow.protect_tables did not map to external_reflow_protect_tables")
     assert(pane.config.reflow_margin == 12, "markdown.reflow.margin did not map to reflow_margin")
+    assert(pane.config.focus_on_switch == false, "lifecycle.focus_on_switch did not map to focus_on_switch")
+    assert(pane.config.focus_on_ask == false, "lifecycle.focus_on_ask did not map to focus_on_ask")
+    assert(pane.config.shutdown_on_exit == false, "lifecycle.shutdown_on_exit did not map to shutdown_on_exit")
+    assert(pane.config.shutdown_timeout_ms == 123, "lifecycle.shutdown_timeout_ms did not map to shutdown_timeout_ms")
+    assert(pane.config.validate == false, "validation.enabled did not map to validate")
     assert(pane.config.tools.claude == nil, "disabled tool was still present")
     assert(pane.config.tools.codex.cmd[1] == "sh", "generated tool lost explicit command override")
     assert(pane.config.tools.codex.presets[1].name == "gpt56_sol_medium_normal", "default generated preset was not first")
     assert(pane.config.tools.codex.presets[1].model == "gpt-5.6-sol", "generated preset model was wrong")
     assert(pane.config.tools.codex.presets[1].effort == "medium", "generated preset effort was wrong")
     assert(pane.config.tools.codex.presets[1].speed == "normal", "generated preset speed was wrong")
+end)
+
+test("canonical default setup normalizes to runtime defaults", function()
+    local setup = config.default_setup()
+    local normalized = config.normalize(vim.deepcopy(defaults.config), setup)
+
+    assert(setup.width == nil, "default setup exposed flat width")
+    assert(setup.external_reflow_cmd == nil, "default setup exposed flat reflow command")
+    assert(setup.validate == nil, "default setup exposed flat validation key")
+    assert(setup.layout.width == defaults.config.width, "default setup layout width was wrong")
+    assert(setup.layout.zoom_text_width == defaults.config.zoom_text_width, "default setup zoom width was wrong")
+    assert(setup.markdown.wrap == defaults.config.wrap, "default setup markdown wrap was wrong")
+    assert(setup.markdown.reflow.enabled == defaults.config.auto_reflow, "default setup reflow enabled was wrong")
+    assert(setup.lifecycle.shutdown_on_exit == defaults.config.shutdown_on_exit, "default setup lifecycle was wrong")
+    assert(setup.validation.enabled == defaults.config.validate, "default setup validation was wrong")
+    assert(vim.deep_equal(normalized, defaults.config), "canonical default setup did not round-trip to runtime defaults")
+end)
+
+test("runtime config converts to canonical setup shape", function()
+    local runtime = vim.tbl_deep_extend("force", vim.deepcopy(defaults.config), {
+        width = 72,
+        zoom_text_width = 66,
+        wrap = true,
+        wrap_toggle_key = "<leader>xw",
+        sticky_heading = false,
+        auto_reflow = false,
+        external_reflow_cmd = { "mdfmt", "--stdin" },
+        external_reflow_fallback = false,
+        external_reflow_protect_tables = false,
+        reflow_margin = 5,
+        focus_on_switch = false,
+        focus_on_ask = false,
+        shutdown_on_exit = false,
+        shutdown_timeout_ms = 99,
+        validate = false,
+    })
+    local setup = config.to_setup(runtime)
+    local normalized = config.normalize(vim.deepcopy(defaults.config), setup)
+
+    assert(setup.layout.width == 72, "to_setup lost width")
+    assert(setup.layout.zoom_text_width == 66, "to_setup lost zoom text width")
+    assert(setup.markdown.wrap == true, "to_setup lost markdown wrap")
+    assert(setup.markdown.wrap_toggle_key == "<leader>xw", "to_setup lost wrap mapping")
+    assert(setup.markdown.sticky_heading == false, "to_setup lost sticky heading")
+    assert(setup.markdown.reflow.enabled == false, "to_setup lost reflow enabled")
+    assert(setup.markdown.reflow.cmd[1] == "mdfmt", "to_setup lost reflow command")
+    assert(setup.markdown.reflow.fallback == false, "to_setup lost reflow fallback")
+    assert(setup.markdown.reflow.protect_tables == false, "to_setup lost table protection")
+    assert(setup.markdown.reflow.margin == 5, "to_setup lost reflow margin")
+    assert(setup.lifecycle.focus_on_switch == false, "to_setup lost focus_on_switch")
+    assert(setup.lifecycle.focus_on_ask == false, "to_setup lost focus_on_ask")
+    assert(setup.lifecycle.shutdown_on_exit == false, "to_setup lost shutdown_on_exit")
+    assert(setup.lifecycle.shutdown_timeout_ms == 99, "to_setup lost shutdown timeout")
+    assert(setup.validation.enabled == false, "to_setup lost validation flag")
+    assert(vim.deep_equal(normalized, runtime), "canonical setup did not round-trip custom runtime config")
 end)
 
 test("config expansion leaves legacy presets intact", function()
@@ -999,6 +1210,7 @@ test("setup validation reports malformed config and implied dependency gaps", fu
 
     local diagnostics = validation.diagnostics({
         commands = {
+            root = "Sidepanes",
             pick = "SidepanesPick",
             headings = "SidepanesHeadings",
             bogus = "Nope",
