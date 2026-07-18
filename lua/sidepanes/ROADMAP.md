@@ -39,6 +39,9 @@ Recently completed or in progress:
 - The audit smoke test enforces top-level Purpose/Does/Architecture comments for all `lua/sidepanes/*.lua` modules.
 - `doc/sidepanes.txt` provides `:help sidepanes`; `doc/sidepanes.md` carries the longer reference.
 - `:Sidepanes help` opens the Neovim help page, falling back to the subcommand summary if helptags are unavailable.
+- Pane-local smart `gf` is owned by `lua/sidepanes/smart_gf.lua`; `lua/smart_gf/init.lua` remains a compatibility shim.
+- `markdown_reflow` remains a separate companion utility because it has standalone commands, mappings, and use outside Sidepanes.
+- `:checkhealth sidepanes` reports global and pane-local mapping modes.
 
 ## Roadmap
 
@@ -135,13 +138,23 @@ Acceptance:
 
 ### 5. Package Hygiene
 
+Status: in progress.
+
 Prepare Sidepanes as a proper standalone-ish Neovim plugin surface.
+
+Completed refinements:
+
+- Moved pane-local smart `gf` into `lua/sidepanes/smart_gf.lua`.
+- Kept `lua/smart_gf/init.lua` as a compatibility shim for older config/tests.
+- Removed `smart_gf` from external Sidepanes dependency validation.
+- Made `:checkhealth sidepanes` report global and pane-local mapping modes.
 
 Possible work:
 
 - Keep `doc/sidepanes.md` aligned with the help file and README quickstart.
 - Maintain helptags-compatible sections as commands and API evolve.
 - Keep module top-level comments consistent; the audit smoke test now enforces Purpose/Does/Architecture headers.
+- Keep built-in helpers such as `sidepanes.smart_gf` under the Sidepanes namespace unless they are genuinely standalone.
 - Confirm no personal config assumptions leak into plugin modules.
 - Keep personal `init.lua` as a consumer of the public setup/config surface.
 
@@ -174,5 +187,6 @@ For public API or dependency work, also run or verify:
 - public facade assertions for stable/hidden functions
 - legacy module-name scan
 - module top-level comment sweep
+- checkhealth smoke assertions for mode-aware mapping reports
 
 The goal is not mathematical proof. The goal is targeted coverage deep enough to catch realistic regressions in the changed behavior.

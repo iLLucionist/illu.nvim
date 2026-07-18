@@ -207,6 +207,9 @@ Pane-local mappings are installed inside Sidepanes buffers:
     ac               ask Claude from visual selection
 <
 
+Pane-local `gf` is implemented by `sidepanes.smart_gf`. The old
+`require("smart_gf")` module remains as a compatibility shim.
+
 ==============================================================================
 CONFIGURATION                                       *sidepanes-configuration*
 
@@ -406,7 +409,7 @@ The health check reports:
 - external commands such as codex, claude, ipython, uv, and mdfmt
 - optional dependencies used by enabled features
 - command registration
-- global mappings
+- global and pane-local mappings, including expected modes
 - malformed config values
 
 Setup also performs lightweight validation by default. Disable it with:

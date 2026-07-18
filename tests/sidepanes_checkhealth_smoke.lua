@@ -15,7 +15,8 @@ local report = table.concat(lines, "\n")
 assert(report:find("sidepanes.nvim loaded", 1, true), "health report did not load sidepanes:\n" .. report)
 assert(report:find("Codex presets configured: 12", 1, true), "health report did not include Codex presets:\n" .. report)
 assert(report:find("Command registered: :Sidepanes", 1, true), "health report did not include root command:\n" .. report)
-assert(report:find("Pane%-local mapping config is present%."), "health report did not include pane mappings:\n" .. report)
+assert(report:find("Global mapping registered (n, x): <leader>pl", 1, true), "health report did not include global mapping modes:\n" .. report)
+assert(report:find("Pane-local mapping configured (x): aa", 1, true), "health report did not include pane-local mapping modes:\n" .. report)
 
 for _, pattern in ipairs({ "ERROR", "WARNING", "WARN", "❌", "⚠" }) do
     assert(not report:find(pattern, 1, true), "health report contained " .. pattern .. ":\n" .. report)

@@ -1,12 +1,12 @@
 --[[
 sidepanes.maps
 Purpose: Install pane-local keymaps for markdown and terminal pane buffers.
-Does: Binds quick pane switching, smart gf, ask mappings, and markdown wrap toggling with buffer-local scope.
+Does: Binds quick pane switching, built-in smart gf, ask mappings, and markdown wrap toggling with buffer-local scope.
 Architecture: Receives behavior through dependency callbacks from init.lua so mappings stay declarative and do not own plugin state.
 ]]
 
 local M = {}
-local dependencies = require("sidepanes.dependencies")
+local smart_gf = require("sidepanes.smart_gf")
 
 --- Install one buffer-local pane mapping.
 local function map(bufnr, mode, lhs, rhs, desc, opts)
@@ -76,11 +76,7 @@ function M.setup(bufnr, deps)
     end, "Show IPython pane")
 
     map(bufnr, "n", mappings.gf, function()
-        if dependencies.notify_missing("smart_gf") then
-            return
-        end
-
-        require("smart_gf").open()
+        smart_gf.open()
     end, "Smart go to file from pane")
 
     map(bufnr, "x", mappings.send_ipython, function()

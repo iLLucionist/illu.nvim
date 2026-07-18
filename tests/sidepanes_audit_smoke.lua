@@ -186,6 +186,9 @@ end
 assert(has_report(reports, "ok", "sidepanes.nvim loaded"), "health did not report sidepanes loaded")
 assert(has_report(reports, "ok", "Codex presets configured: 12"), "health did not report Codex presets")
 assert(has_report(reports, "ok", "Command registered: :SidepanesSwitch"), "health did not report SidepanesSwitch")
-assert(has_report(reports, "ok", "Global mapping registered: <leader>pp"), "health did not report global mappings")
+assert(has_report(reports, "ok", "Global mapping registered (n): <leader>pp"), "health did not report normal global mapping mode")
+assert(has_report(reports, "ok", "Global mapping registered (x): aa"), "health did not report visual global mapping mode")
+assert(has_report(reports, "ok", "Global mapping registered (n, x): <leader>pl"), "health did not report multi-mode global mapping")
+assert(has_report(reports, "ok", "Pane-local mapping configured (x): aa"), "health did not report pane-local mapping mode")
 
 print("sidepanes audit smoke passed")

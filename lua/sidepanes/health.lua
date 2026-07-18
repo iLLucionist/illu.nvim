@@ -32,43 +32,43 @@ local default_commands = {
 }
 
 local expected_global_mappings = {
-    toggle = "n",
-    pick = "n",
-    headings = "n",
-    markdown = "n",
-    codex = "n",
-    claude = "n",
-    ipython = "n",
-    restart_ipython = "n",
-    send_ipython = { "n", "x" },
-    clear_ipython = "n",
-    focus = "n",
-    zoom = "n",
-    width_previous = "n",
-    width_next = "n",
-    width_picker = "n",
-    sticky_relative_width = "n",
-    switch = "n",
-    ask = "x",
-    ask_last = "x",
-    ask_codex = "x",
-    ask_claude = "x",
+    { key = "toggle", modes = "n" },
+    { key = "pick", modes = "n" },
+    { key = "headings", modes = "n" },
+    { key = "markdown", modes = "n" },
+    { key = "codex", modes = "n" },
+    { key = "claude", modes = "n" },
+    { key = "ipython", modes = "n" },
+    { key = "restart_ipython", modes = "n" },
+    { key = "send_ipython", modes = { "n", "x" } },
+    { key = "clear_ipython", modes = "n" },
+    { key = "focus", modes = "n" },
+    { key = "zoom", modes = "n" },
+    { key = "width_previous", modes = "n" },
+    { key = "width_next", modes = "n" },
+    { key = "width_picker", modes = "n" },
+    { key = "sticky_relative_width", modes = "n" },
+    { key = "switch", modes = "n" },
+    { key = "ask", modes = "x" },
+    { key = "ask_last", modes = "x" },
+    { key = "ask_codex", modes = "x" },
+    { key = "ask_claude", modes = "x" },
 }
 
 local expected_pane_mappings = {
-    "markdown",
-    "codex",
-    "claude",
-    "ipython",
-    "toggle_agent",
-    "toggle_agent_alt",
-    "ipython_alt",
-    "gf",
-    "send_ipython",
-    "zoom",
-    "ask_last",
-    "ask_codex",
-    "ask_claude",
+    { key = "markdown", modes = "n" },
+    { key = "codex", modes = "n" },
+    { key = "claude", modes = "n" },
+    { key = "ipython", modes = "n" },
+    { key = "toggle_agent", modes = "n" },
+    { key = "toggle_agent_alt", modes = "n" },
+    { key = "ipython_alt", modes = "n" },
+    { key = "gf", modes = "n" },
+    { key = "send_ipython", modes = "x" },
+    { key = "zoom", modes = "n" },
+    { key = "ask_last", modes = "x" },
+    { key = "ask_codex", modes = "x" },
+    { key = "ask_claude", modes = "x" },
 }
 
 --- Return the active health reporter table.
@@ -175,7 +175,7 @@ local function check_dependencies()
     start("Lua dependencies")
     check_module("markview", "markview", false)
     check_module("telescope", "telescope.nvim", false)
-    check_module("smart_gf", "smart_gf", false)
+    check_module("sidepanes.smart_gf", "built-in sidepanes.smart_gf", true)
 
     if dependencies.has_parser("markdown") then
         ok("Treesitter markdown parser found")
@@ -272,19 +272,29 @@ local function check_layout(config)
 end
 
 --- Report malformed mapping entries for one mapping group.
-local function check_mapping_values(group_name, mappings, expected)
-    for _, key in ipairs(expected) do
+local function check_mapping_values(group_name, mappings, specs)
+    for _, spec in ipairs(specs) do
+        local key = spec.key
+
         if not valid_mapping_value(mappings[key]) then
             error("Invalid " .. group_name .. " mapping for " .. key, "Use a lhs string, false, or nil.")
         end
     end
 end
 
+--- Return expected modes as a list.
+local function mode_list(modes)
+    return type(modes) == "table" and modes or { modes }
+end
+
+--- Return a display label for one or more mapping modes.
+local function mode_label(modes)
+    return table.concat(mode_list(modes), ", ")
+end
+
 --- Return whether a global mapping is present for all expected modes.
 local function global_mapping_present(lhs, modes)
-    modes = type(modes) == "table" and modes or { modes }
-
-    for _, mode in ipairs(modes) do
+    for _, mode in ipairs(mode_list(modes)) do
         local map = vim.fn.maparg(lhs, mode, false, true)
 
         if not map.lhs or map.lhs == "" then
@@ -309,13 +319,17 @@ local function check_mappings(config)
             error("Invalid mappings.global config.", "Use false or a table of mapping names to lhs strings.")
         end
     elseif type(global) == "table" then
-        for key in pairs(expected_global_mappings) do
+        for _, spec in ipairs(expected_global_mappings) do
+            local key = spec.key
+            local modes = spec.modes
+            local modes_text = mode_label(modes)
+
             if not valid_mapping_value(global[key]) then
                 error("Invalid global mapping for " .. key, "Use a lhs string, false, or nil.")
-            elseif type(global[key]) == "string" and global_mapping_present(global[key], expected_global_mappings[key]) then
-                ok("Global mapping registered: " .. global[key])
+            elseif type(global[key]) == "string" and global_mapping_present(global[key], modes) then
+                ok("Global mapping registered (" .. modes_text .. "): " .. global[key])
             elseif type(global[key]) == "string" then
-                warn("Configured global mapping is not registered: " .. global[key], "Call require('sidepanes').setup() before running :checkhealth sidepanes.")
+                warn("Configured global mapping is not registered (" .. modes_text .. "): " .. global[key], "Call require('sidepanes').setup() before running :checkhealth sidepanes.")
             end
         end
     else
@@ -324,7 +338,14 @@ local function check_mappings(config)
 
     if type(mappings.pane) == "table" then
         check_mapping_values("pane", mappings.pane, expected_pane_mappings)
-        ok("Pane-local mapping config is present.")
+
+        for _, spec in ipairs(expected_pane_mappings) do
+            local lhs = mappings.pane[spec.key]
+
+            if type(lhs) == "string" then
+                ok("Pane-local mapping configured (" .. mode_label(spec.modes) .. "): " .. lhs)
+            end
+        end
     else
         warn("Pane-local mapping config is missing.", "Use mappings.pane or keep the built-in defaults.")
     end

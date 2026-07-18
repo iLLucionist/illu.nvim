@@ -419,8 +419,9 @@ Run:
 :checkhealth sidepanes
 ```
 
-Health checks report configured commands, global mappings, tool presets,
-external commands, optional dependencies, and malformed config.
+Health checks report configured commands, mapping lhs values with their
+expected modes, tool presets, external commands, optional dependencies, and
+malformed config.
 
 Optional dependencies are tied to features:
 
@@ -428,11 +429,13 @@ Optional dependencies are tied to features:
 | --- | --- |
 | `telescope.nvim` | Document and heading pickers. |
 | Markdown Treesitter parser | Heading/code-fence context. |
-| `smart_gf` | Pane-local `gf`. |
 | `mdfmt` | External Markdown reflow when configured. |
 | `codex` | Codex terminal tool. |
 | `claude` | Claude terminal tool. |
 | `ipython` / `uv` | IPython pane. |
+
+Pane-local `gf` is built in as `sidepanes.smart_gf`. The old
+`require("smart_gf")` module remains as a compatibility shim.
 
 Setup validation is enabled by default and warns for malformed config or
 missing dependencies implied by enabled features.

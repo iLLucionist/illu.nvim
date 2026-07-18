@@ -35,9 +35,7 @@ local global_mapping_features = {
     headings = "heading_picker",
 }
 
-local pane_mapping_features = {
-    gf = "smart_gf",
-}
+local pane_mapping_features = {}
 
 --- Return whether a width-like value can be parsed by Sidepanes.
 local function valid_width_value(value)

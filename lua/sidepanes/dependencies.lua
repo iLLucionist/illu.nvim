@@ -23,12 +23,6 @@ M.features = {
             { name = "markdown", label = "Treesitter markdown parser" },
         },
     },
-    smart_gf = {
-        label = "smart gf",
-        modules = {
-            { name = "smart_gf", label = "smart_gf" },
-        },
-    },
     markview = {
         label = "markdown rendering",
         modules = {

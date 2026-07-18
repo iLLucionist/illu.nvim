@@ -1523,7 +1523,7 @@ test("health check reports configured commands, mappings, and tools", function()
     assert(has_health_report(reports, "ok", "Treesitter markdown parser found"), "health did not check markdown parser")
     assert(has_health_report(reports, "info", "Sidepanes user commands are disabled."), "health did not report disabled commands")
     assert(has_health_report(reports, "info", "Global mappings are disabled."), "health did not report disabled global mappings")
-    assert(has_health_report(reports, "ok", "Pane-local mapping config is present."), "health did not report pane mappings")
+    assert(has_health_report(reports, "ok", "Pane-local mapping configured (n): <space>0"), "health did not report pane mapping mode")
 end)
 
 test("health check reports malformed config", function()
@@ -1590,8 +1590,6 @@ test("setup validation reports malformed config and implied dependency gaps", fu
             return { "Treesitter markdown parser" }
         elseif feature_name == "document_picker" then
             return { "telescope.nvim" }
-        elseif feature_name == "smart_gf" then
-            return { "smart_gf" }
         end
 
         return {}
@@ -1639,7 +1637,6 @@ test("setup validation reports malformed config and implied dependency gaps", fu
     assert(joined:find("Invalid Sidepanes pane mapping for markdown", 1, true), joined)
     assert(joined:find("Sidepanes dependency missing for document picker: telescope.nvim", 1, true), joined)
     assert(joined:find("Sidepanes dependency missing for markdown headings: Treesitter markdown parser", 1, true), joined)
-    assert(joined:find("Sidepanes dependency missing for smart gf: smart_gf", 1, true), joined)
     assert(joined:find("Invalid Sidepanes width_snap_points entry at index 2", 1, true), joined)
     assert(joined:find("Invalid Sidepanes width_picker_points entry at index 2", 1, true), joined)
     assert(joined:find("Sidepanes tool executable not found for broken", 1, true), joined)
@@ -1714,37 +1711,10 @@ test("runtime dependency guards stop feature commands gracefully", function()
         end,
     })
 
-    local bufnr = vim.api.nvim_create_buf(false, true)
-
-    local_maps.setup(bufnr, {
-        ask_current_coding_agent = function() end,
-        ask_last_coding_agent = function() end,
-        markdown_bufnr = function()
-            return bufnr
-        end,
-        open_terminal = function() end,
-        pane_mappings = function()
-            return {
-                gf = "gf",
-            }
-        end,
-        pane_root = function()
-            return vim.fn.getcwd()
-        end,
-        show_markdown = function() end,
-        toggle_markdown_agent = function() end,
-        toggle_wrap = function() end,
-        wrap_toggle_key = function()
-            return false
-        end,
-    })
-    call_map(bufnr, "gf")
-
     dependencies.notify_missing = original_notify_missing
 
     assert(vim.tbl_contains(calls, "document_picker"), "document picker did not check dependencies")
     assert(vim.tbl_contains(calls, "heading_picker"), "heading picker did not check dependencies")
-    assert(vim.tbl_contains(calls, "smart_gf"), "smart gf map did not check dependencies")
 end)
 
 test("runtime dependency warning names missing parser", function()
@@ -2422,6 +2392,10 @@ test("asking with a new preset reuses the same agent session and sends a model s
     assert(current[1].preset_name == "two", "model picker current preset did not follow switch")
 end)
 
+test("smart gf compatibility shim re-exports sidepanes implementation", function()
+    assert(require("smart_gf") == require("sidepanes.smart_gf"), "smart_gf shim did not re-export sidepanes.smart_gf")
+end)
+
 test("smart gf from sidepanes opens in last non-pane window", function()
     reset_pane()
 
@@ -2440,7 +2414,7 @@ test("smart gf from sidepanes opens in last non-pane window", function()
     assert(vim.api.nvim_get_current_win() == pane.winid, "pane did not focus")
 
     vim.api.nvim_win_set_cursor(pane.winid, { 3, 5 })
-    require("smart_gf").open()
+    require("sidepanes.smart_gf").open()
 
     assert(vim.api.nvim_get_current_win() == origin_win, "gf did not return to origin window")
     assert(vim.api.nvim_buf_get_name(0) == root .. "/src/ir.py", "gf opened wrong buffer")
