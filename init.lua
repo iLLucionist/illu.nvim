@@ -371,6 +371,7 @@ sidepanes.setup({
         zoom_text_width = 90,
         sticky_relative_width = false,
         width_snap_points = { 60, 70, 80, 90, 100, 110, 120, "1/3", "40%", "1/2", "60%", "2/3", "75%" },
+        width_picker_points = { "1/4", "1/3", "2/5", "1/2", "60%", "2/3", "75%", 100, 120 },
     },
     markdown = {
         wrap = false,
@@ -407,6 +408,7 @@ sidepanes.setup({
         ipython_clear = "SidepanesIPythonClear",
         focus = "SidepanesFocus",
         zoom = "SidepanesZoom",
+        width_picker = "SidepanesWidthPick",
         ask = "SidepanesAsk",
         ask_codex = "SidepanesAskCodex",
         ask_claude = "SidepanesAskClaude",
@@ -427,6 +429,7 @@ sidepanes.setup({
             zoom = "<leader>pz",
             width_previous = "<leader>p-",
             width_next = "<leader>p+",
+            width_picker = "<leader>pw",
             sticky_relative_width = "<leader>p%",
             switch = "<leader>ps",
             ask = "<leader>pa",

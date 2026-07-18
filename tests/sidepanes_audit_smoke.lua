@@ -82,6 +82,7 @@ local expected_commands = {
     "SidepanesFocus",
     "SidepanesZoom",
     "SidepanesWidth",
+    "SidepanesWidthPick",
     "SidepanesAsk",
     "SidepanesAskCodex",
     "SidepanesAskClaude",
@@ -120,6 +121,7 @@ local expected_maps = {
     { "n", "<leader>pz" },
     { "n", "<leader>p-" },
     { "n", "<leader>p+" },
+    { "n", "<leader>pw" },
     { "n", "<leader>p%" },
     { "n", "<leader>ps" },
     { "x", "<leader>pa" },
@@ -146,6 +148,7 @@ assert(pane_config.width == 100, "configured pane width changed")
 assert(pane_config.zoom_text_width == 90, "configured zoom text width changed")
 assert(pane_config.sticky_relative_width == false, "configured sticky relative width changed")
 assert(pane_config.width_snap_points[1] == 60 and pane_config.width_snap_points[#pane_config.width_snap_points] == "75%", "configured width snap points changed")
+assert(pane_config.width_picker_points[1] == "1/4" and pane_config.width_picker_points[#pane_config.width_picker_points] == 120, "configured width picker points changed")
 assert(pane_config.external_reflow_cmd[1] == "mdfmt", "configured external reflow command changed")
 assert(#pane_config.tools.codex.presets == 12, "configured Codex preset count changed")
 assert(pane_config.tools.codex.presets[1].name == "gpt55_high_fast", "configured Codex default changed")

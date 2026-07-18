@@ -319,8 +319,17 @@ local function snap_direction(direction)
     return nil
 end
 
---- Return sorted, unique width snap boundaries for the current screen.
-local function snap_boundaries(points, current_width)
+--- Return a display label for a configured width point.
+local function width_label(value)
+    if type(value) == "number" and value > 0 and value < 1 then
+        return tostring(value)
+    end
+
+    return tostring(value)
+end
+
+--- Return sorted, unique width boundaries for the current screen.
+function M.width_boundaries(points, current_width)
     if type(points) ~= "table" then
         return {}
     end
@@ -338,6 +347,7 @@ local function snap_boundaries(points, current_width)
                     width = width,
                     relative_width = relative_width,
                     value = point,
+                    label = width_label(point),
                 }
             end
         end
@@ -356,6 +366,31 @@ local function snap_boundaries(points, current_width)
     return result
 end
 
+--- Return the neighboring configured snap boundaries around a width.
+function M.width_boundary_context(current_width, points)
+    current_width = M.clamp_width(current_width)
+
+    local previous = nil
+    local current = nil
+    local next_boundary = nil
+
+    for _, boundary in ipairs(M.width_boundaries(points, current_width)) do
+        if boundary.width < current_width then
+            previous = boundary
+        elseif boundary.width == current_width then
+            current = boundary
+        elseif boundary.width > current_width and not next_boundary then
+            next_boundary = boundary
+        end
+    end
+
+    return {
+        previous = previous,
+        current = current,
+        next = next_boundary,
+    }
+end
+
 --- Resolve the next or previous configured snap boundary.
 function M.resolve_width_snap(current_width, direction, points)
     local normalized_direction = snap_direction(direction)
@@ -367,13 +402,13 @@ function M.resolve_width_snap(current_width, direction, points)
     current_width = M.clamp_width(current_width)
 
     if normalized_direction > 0 then
-        for _, boundary in ipairs(snap_boundaries(points, current_width)) do
+        for _, boundary in ipairs(M.width_boundaries(points, current_width)) do
             if boundary.width > current_width then
                 return boundary.width, nil, boundary.relative_width, boundary.value
             end
         end
     else
-        local boundaries = snap_boundaries(points, current_width)
+        local boundaries = M.width_boundaries(points, current_width)
 
         for index = #boundaries, 1, -1 do
             local boundary = boundaries[index]

@@ -18,6 +18,7 @@ M.config = {
     zoom_text_width = 90,
     sticky_relative_width = false,
     width_snap_points = { 60, 70, 80, 90, 100, 110, 120, "1/3", "40%", "1/2", "60%", "2/3", "75%" },
+    width_picker_points = { "1/4", "1/3", "2/5", "1/2", "60%", "2/3", "75%", 100, 120 },
     sticky_heading = true,
     wrap_toggle_key = "<leader>mw",
     focus_on_switch = true,

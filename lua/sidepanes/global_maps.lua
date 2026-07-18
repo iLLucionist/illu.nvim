@@ -101,6 +101,10 @@ function M.setup(api, mappings)
         api.snap_width("next")
     end, "Increase sidepanes width to snap point")
 
+    map("n", mappings.width_picker, function()
+        api.width_picker()
+    end, "Pick sidepanes width")
+
     map("n", mappings.sticky_relative_width, function()
         api.toggle_sticky_relative_width()
     end, "Toggle sidepanes sticky relative width")

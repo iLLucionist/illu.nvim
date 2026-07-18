@@ -412,10 +412,37 @@ function M.adjust_width(delta)
     return apply_width(width)
 end
 
+--- Return display text for a resolved width boundary.
+local function width_boundary_label(boundary)
+    if not boundary then
+        return "none"
+    end
+
+    return tostring(boundary.label or boundary.value or boundary.width) .. " (" .. tostring(boundary.width) .. " cols)"
+end
+
+--- Notify the user where width snapping landed and nearby snap points.
+local function notify_width_snap(width, point)
+    local context = api_helpers.width_boundary_context(width, M.config.width_snap_points)
+    local current = point and tostring(point) or (context.current and context.current.label) or tostring(width)
+
+    vim.notify(
+        "Sidepanes width: "
+            .. tostring(current)
+            .. " ("
+            .. tostring(width)
+            .. " cols); previous "
+            .. width_boundary_label(context.previous)
+            .. "; next "
+            .. width_boundary_label(context.next),
+        vim.log.levels.INFO
+    )
+end
+
 --- Move the normal pane width to the next or previous configured snap point.
 function M.snap_width(direction)
     local current_width = pane_window.width(M)
-    local width, err, relative_width = api_helpers.resolve_width_snap(current_width, direction, M.config.width_snap_points)
+    local width, err, relative_width, point = api_helpers.resolve_width_snap(current_width, direction, M.config.width_snap_points)
 
     if not width then
         vim.notify(err, vim.log.levels.ERROR)
@@ -423,10 +450,48 @@ function M.snap_width(direction)
     end
 
     if width == current_width and not relative_width then
+        notify_width_snap(width, point)
         return width
     end
 
-    return apply_width(width, { relative_width = relative_width })
+    local applied = apply_width(width, { relative_width = relative_width })
+
+    notify_width_snap(applied, point)
+
+    return applied
+end
+
+--- Build picker entries for configured common width points.
+local function width_picker_entries()
+    local entries = {}
+    local current_width = pane_window.width(M)
+
+    for index, boundary in ipairs(api_helpers.width_boundaries(M.config.width_picker_points or M.config.width_snap_points, current_width)) do
+        table.insert(entries, {
+            index = index,
+            key = tostring(index),
+            value = boundary.value,
+            width = boundary.width,
+            relative_width = boundary.relative_width,
+            current = boundary.width == current_width,
+            label = tostring(boundary.label) .. "  (" .. tostring(boundary.width) .. " cols)",
+        })
+    end
+
+    return entries
+end
+
+--- Show a picker for common pane width snap points.
+function M.width_picker()
+    numbered_select("Sidepanes width", width_picker_entries(), function(choice)
+        if not choice then
+            return
+        end
+
+        local applied = apply_width(choice.width, { relative_width = choice.relative_width })
+
+        notify_width_snap(applied, choice.value)
+    end)
 end
 
 --- Toggle whether relative pane widths stay tied to total Neovim columns.
@@ -761,6 +826,7 @@ local public_functions = {
     "set_width",
     "adjust_width",
     "snap_width",
+    "width_picker",
     "toggle_sticky_relative_width",
     "text_width",
     "toggle_wrap",

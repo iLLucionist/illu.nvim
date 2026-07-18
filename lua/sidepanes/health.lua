@@ -25,6 +25,7 @@ local default_commands = {
     focus = "SidepanesFocus",
     zoom = "SidepanesZoom",
     width = "SidepanesWidth",
+    width_picker = "SidepanesWidthPick",
     ask = "SidepanesAsk",
     ask_codex = "SidepanesAskCodex",
     ask_claude = "SidepanesAskClaude",
@@ -45,6 +46,7 @@ local expected_global_mappings = {
     zoom = "n",
     width_previous = "n",
     width_next = "n",
+    width_picker = "n",
     sticky_relative_width = "n",
     switch = "n",
     ask = "x",
@@ -245,19 +247,25 @@ local function check_layout(config)
         ok("Pane width configured: " .. tostring(config.width))
     end
 
-    if type(config.width_snap_points) ~= "table" then
-        error("Invalid width_snap_points config.", "Use a table of width values.")
-        return
-    end
+    for _, name in ipairs({ "width_snap_points", "width_picker_points" }) do
+        local values = config[name]
 
-    for index, value in ipairs(config.width_snap_points) do
-        if not valid_width_value(value) then
-            error("Invalid width snap point at index " .. index, "Use columns, a percentage string, a fraction string, or a numeric ratio.")
+        if values == nil then
+            info(name .. " is not configured.")
+        elseif type(values) ~= "table" then
+            error("Invalid " .. name .. " config.", "Use a table of width values.")
             return
+        else
+            for index, value in ipairs(values) do
+                if not valid_width_value(value) then
+                    error("Invalid " .. name .. " entry at index " .. index, "Use columns, a percentage string, a fraction string, or a numeric ratio.")
+                    return
+                end
+            end
+
+            ok(name .. " configured: " .. tostring(#values))
         end
     end
-
-    ok("Width snap points configured: " .. tostring(#config.width_snap_points))
 end
 
 --- Report malformed mapping entries for one mapping group.

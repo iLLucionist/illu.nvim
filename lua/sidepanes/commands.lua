@@ -22,6 +22,7 @@ local default_names = {
     focus = "SidepanesFocus",
     zoom = "SidepanesZoom",
     width = "SidepanesWidth",
+    width_picker = "SidepanesWidthPick",
     ask = "SidepanesAsk",
     ask_codex = "SidepanesAskCodex",
     ask_claude = "SidepanesAskClaude",
@@ -46,6 +47,7 @@ local subcommand_names = {
     "toggle",
     "tool",
     "width",
+    "width-pick",
     "zoom",
 }
 
@@ -252,6 +254,8 @@ local function dispatch_root(api, opts)
         api.toggle_zoom()
     elseif subcommand == "width" then
         dispatch_width(api, rest_args(parts))
+    elseif subcommand == "width-pick" then
+        api.width_picker()
     elseif subcommand == "ask" then
         api.ask_picker(range_opts(opts))
     elseif subcommand == "ask-codex" then
@@ -352,6 +356,10 @@ function M.setup(api, config)
     command(names.width, function(opts)
         dispatch_width(api, opts.args)
     end, { nargs = "?" })
+
+    command(names.width_picker, function()
+        api.width_picker()
+    end, {})
 
     command(names.ask, function(opts)
         api.ask_picker(range_opts(opts))

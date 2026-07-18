@@ -27,6 +27,7 @@ local function expand_layout(opts)
     set_if_present(expanded, "zoom_text_width", layout.zoom_text_width)
     set_if_present(expanded, "sticky_relative_width", layout.sticky_relative_width)
     set_if_present(expanded, "width_snap_points", layout.width_snap_points)
+    set_if_present(expanded, "width_picker_points", layout.width_picker_points)
     expanded.layout = nil
 
     return expanded
@@ -170,6 +171,7 @@ function M.to_setup(runtime_config)
             zoom_text_width = config.zoom_text_width,
             sticky_relative_width = config.sticky_relative_width,
             width_snap_points = config.width_snap_points,
+            width_picker_points = config.width_picker_points,
         },
         markdown = {
             wrap = config.wrap,

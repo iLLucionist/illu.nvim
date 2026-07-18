@@ -245,6 +245,7 @@ test("public facade hides mutable state and exposes config copy", function()
         "set_width",
         "adjust_width",
         "snap_width",
+        "width_picker",
         "toggle_sticky_relative_width",
         "show_markdown",
         "switch_picker",
@@ -707,6 +708,9 @@ test("command registration invokes facade callbacks", function()
         adjust_width = function(value)
             calls.adjust_width = value
         end,
+        width_picker = function()
+            calls.width_picker = true
+        end,
         ask_picker = function(opts)
             calls.ask = opts
         end,
@@ -727,6 +731,7 @@ test("command registration invokes facade callbacks", function()
         focus = "SidepanesTestFocus",
         zoom = "SidepanesTestZoom",
         width = "SidepanesTestWidth",
+        width_picker = "SidepanesTestWidthPick",
         ask = "SidepanesTestAsk",
         ask_codex = "SidepanesTestAskCodex",
         ask_claude = "SidepanesTestAskClaude",
@@ -767,6 +772,8 @@ test("command registration invokes facade callbacks", function()
         vim.cmd("SidepanesTestWidth")
     end)
     assert(calls.get_width == true, "width command without args did not report width")
+    vim.cmd("SidepanesTestWidthPick")
+    assert(calls.width_picker == true, "width picker command did not call picker")
     vim.cmd("2,4SidepanesTestAsk")
     assert(calls.ask.bufnr == bufnr and calls.ask.line1 == 2 and calls.ask.line2 == 4, "ask command did not forward range")
     vim.cmd("3,5SidepanesTestAskCodex gpt55_high_fast")
@@ -831,6 +838,9 @@ test("root command dispatches subcommands and completes choices", function()
         end,
         adjust_width = function(value)
             calls.adjust_width = value
+        end,
+        width_picker = function()
+            calls.width_picker = true
         end,
         ask_picker = function(opts)
             calls.ask = opts
@@ -903,6 +913,8 @@ test("root command dispatches subcommands and completes choices", function()
         vim.cmd("SidepanesRootTest width")
     end)
     assert(calls.get_width == true, "root width subcommand without args did not report width")
+    vim.cmd("SidepanesRootTest width-pick")
+    assert(calls.width_picker == true, "root width-pick subcommand did not call picker")
     vim.cmd("2,4SidepanesRootTest ask")
     assert(calls.ask.bufnr == bufnr and calls.ask.line1 == 2 and calls.ask.line2 == 4, "root ask subcommand did not forward range")
     vim.cmd("3,5SidepanesRootTest ask-codex gpt55_high_fast")
@@ -915,11 +927,13 @@ test("root command dispatches subcommands and completes choices", function()
     assert(calls.ask_tool.opts.line1 == 6 and calls.ask_tool.opts.line2 == 7, "root ask-claude subcommand did not forward range")
 
     local subcommands = vim.fn.getcompletion("SidepanesRootTest co", "cmdline")
+    local width_subcommands = vim.fn.getcompletion("SidepanesRootTest width", "cmdline")
     local tool_names = vim.fn.getcompletion("SidepanesRootTest tool c", "cmdline")
     local codex_presets = vim.fn.getcompletion("SidepanesRootTest codex g", "cmdline")
     local claude_presets = vim.fn.getcompletion("SidepanesRootTest claude s", "cmdline")
 
     assert(vim.tbl_contains(subcommands, "codex"), "root completion did not include codex")
+    assert(vim.tbl_contains(width_subcommands, "width-pick"), "root completion did not include width-pick")
     assert(vim.tbl_contains(tool_names, "codex"), "root tool completion did not include codex")
     assert(vim.tbl_contains(codex_presets, "gpt55_high_fast"), "root codex completion did not include preset")
     assert(vim.tbl_contains(claude_presets, "sonnet"), "root claude completion did not include preset")
@@ -940,6 +954,7 @@ test("default command names use Sidepanes prefix", function()
         get_width = function() end,
         set_width = function() end,
         adjust_width = function() end,
+        width_picker = function() end,
         ask_picker = function() end,
         ask = function() end,
     }
@@ -962,6 +977,7 @@ test("default command names use Sidepanes prefix", function()
         "SidepanesFocus",
         "SidepanesZoom",
         "SidepanesWidth",
+        "SidepanesWidthPick",
         "SidepanesAsk",
         "SidepanesAskCodex",
         "SidepanesAskClaude",
@@ -1034,6 +1050,9 @@ test("global map registration invokes facade callbacks", function()
         snap_width = function(direction)
             calls.snap_width = direction
         end,
+        width_picker = function()
+            calls.width_picker = true
+        end,
         toggle_sticky_relative_width = function()
             calls.sticky_relative_width = true
         end,
@@ -1064,6 +1083,7 @@ test("global map registration invokes facade callbacks", function()
         zoom = "<leader>zz",
         width_previous = "<leader>z-",
         width_next = "<leader>z+",
+        width_picker = "<leader>zw",
         sticky_relative_width = "<leader>z%",
         switch = "<leader>zs",
         ask = "<leader>za",
@@ -1102,6 +1122,8 @@ test("global map registration invokes facade callbacks", function()
     assert(calls.snap_width == "previous", "previous width map did not snap down")
     global_map("<leader>z+").callback()
     assert(calls.snap_width == "next", "next width map did not snap up")
+    global_map("<leader>zw").callback()
+    assert(calls.width_picker == true, "width picker map did not call picker")
     global_map("<leader>z%").callback()
     assert(calls.sticky_relative_width == true, "sticky relative width map did not call toggle")
     global_map("<leader>zs").callback()
@@ -1136,6 +1158,7 @@ test("config normalizes ergonomic markdown and tool setup", function()
             zoom_text_width = 77,
             sticky_relative_width = true,
             width_snap_points = { 72, "50%" },
+            width_picker_points = { "1/3", 88 },
         },
         markdown = {
             wrap = true,
@@ -1178,6 +1201,7 @@ test("config normalizes ergonomic markdown and tool setup", function()
     assert(pane.config.zoom_text_width == 77, "layout.zoom_text_width did not map to zoom_text_width")
     assert(pane.config.sticky_relative_width == true, "layout.sticky_relative_width did not map to sticky_relative_width")
     assert(pane.config.width_snap_points[2] == "50%", "layout.width_snap_points did not map to width_snap_points")
+    assert(pane.config.width_picker_points[1] == "1/3", "layout.width_picker_points did not map to width_picker_points")
     assert(pane.config.wrap == true, "markdown.wrap did not map to wrap")
     assert(pane.config.wrap_toggle_key == "<leader>tw", "markdown.wrap_toggle_key did not map to wrap_toggle_key")
     assert(pane.config.sticky_heading == false, "markdown.sticky_heading did not map to sticky_heading")
@@ -1246,6 +1270,7 @@ test("canonical default setup normalizes to runtime defaults", function()
     assert(setup.layout.zoom_text_width == defaults.config.zoom_text_width, "default setup zoom width was wrong")
     assert(setup.layout.sticky_relative_width == defaults.config.sticky_relative_width, "default setup sticky relative width was wrong")
     assert(vim.deep_equal(setup.layout.width_snap_points, defaults.config.width_snap_points), "default setup width snap points were wrong")
+    assert(vim.deep_equal(setup.layout.width_picker_points, defaults.config.width_picker_points), "default setup width picker points were wrong")
     assert(setup.markdown.wrap == defaults.config.wrap, "default setup markdown wrap was wrong")
     assert(setup.markdown.reflow.enabled == defaults.config.auto_reflow, "default setup reflow enabled was wrong")
     assert(setup.lifecycle.shutdown_on_exit == defaults.config.shutdown_on_exit, "default setup lifecycle was wrong")
@@ -1259,6 +1284,7 @@ test("runtime config converts to canonical setup shape", function()
         zoom_text_width = 66,
         sticky_relative_width = true,
         width_snap_points = { 64, "1/2" },
+        width_picker_points = { "1/4", 72 },
         wrap = true,
         wrap_toggle_key = "<leader>xw",
         sticky_heading = false,
@@ -1280,6 +1306,7 @@ test("runtime config converts to canonical setup shape", function()
     assert(setup.layout.zoom_text_width == 66, "to_setup lost zoom text width")
     assert(setup.layout.sticky_relative_width == true, "to_setup lost sticky relative width")
     assert(setup.layout.width_snap_points[2] == "1/2", "to_setup lost width snap points")
+    assert(setup.layout.width_picker_points[2] == 72, "to_setup lost width picker points")
     assert(setup.markdown.wrap == true, "to_setup lost markdown wrap")
     assert(setup.markdown.wrap_toggle_key == "<leader>xw", "to_setup lost wrap mapping")
     assert(setup.markdown.sticky_heading == false, "to_setup lost sticky heading")
@@ -1476,6 +1503,7 @@ test("health check reports malformed config", function()
             config = {
                 width = 80,
                 width_snap_points = { 80, true },
+                width_picker_points = { "1/2", false },
                 external_reflow_cmd = { "definitely_missing_sidepanes_reflow_cmd" },
                 external_reflow_fallback = false,
                 external_reflow_protect_tables = false,
@@ -1512,7 +1540,7 @@ test("health check reports malformed config", function()
     end)
 
     assert(has_health_report(reports, "error", "External reflow command not found"), "health did not report missing reflow command")
-    assert(has_health_report(reports, "error", "Invalid width snap point at index 2"), "health did not report invalid width snap point")
+    assert(has_health_report(reports, "error", "Invalid width_snap_points entry at index 2"), "health did not report invalid width snap point")
     assert(has_health_report(reports, "warn", "External reflow table protection is disabled."), "health did not report table protection warning")
     assert(has_health_report(reports, "error", "Invalid command name for toggle"), "health did not report invalid command name")
     assert(has_health_report(reports, "error", "Invalid global mapping for toggle"), "health did not report invalid global mapping")
@@ -1559,6 +1587,7 @@ test("setup validation reports malformed config and implied dependency gaps", fu
             },
         },
         width_snap_points = { 80, true },
+        width_picker_points = { "1/2", false },
         tools = {
             broken = {
                 cmd = "definitely_missing_sidepanes_validation_cmd",
@@ -1581,7 +1610,8 @@ test("setup validation reports malformed config and implied dependency gaps", fu
     assert(joined:find("Sidepanes dependency missing for document picker: telescope.nvim", 1, true), joined)
     assert(joined:find("Sidepanes dependency missing for markdown headings: Treesitter markdown parser", 1, true), joined)
     assert(joined:find("Sidepanes dependency missing for smart gf: smart_gf", 1, true), joined)
-    assert(joined:find("Invalid Sidepanes width snap point at index 2", 1, true), joined)
+    assert(joined:find("Invalid Sidepanes width_snap_points entry at index 2", 1, true), joined)
+    assert(joined:find("Invalid Sidepanes width_picker_points entry at index 2", 1, true), joined)
     assert(joined:find("Sidepanes tool executable not found for broken", 1, true), joined)
     assert(joined:find("Sidepanes tool has no presets configured: broken", 1, true), joined)
 end)
@@ -2804,29 +2834,61 @@ test("width snap api moves to configured boundaries and cooperates with sticky r
             width_snap_points = { 80, 100, "1/2", "2/3" },
         })
 
-        sidepanes.snap_width("next")
+        local snap_messages = capture_notify(function()
+            sidepanes.snap_width("next")
+        end)
 
         assert(sidepanes.get_width() == 100, "next snap did not move to the next boundary")
         assert(pane.relative_width and pane.relative_width.ratio == 0.5, "snap did not preserve relative duplicate while sticky")
+        assert(has_notify(snap_messages, "Sidepanes width: 1/2 (100 cols); previous 80 (80 cols); next 2/3"), "snap message did not include landed and neighboring boundaries")
 
         vim.o.columns = 160
         pane.refresh_width()
 
         assert(sidepanes.get_width() == 80, "sticky snap did not track resized columns")
 
-        sidepanes.snap_width("previous")
+        capture_notify(function()
+            sidepanes.snap_width("previous")
+        end)
 
         assert(sidepanes.get_width() == 80, "no-op previous snap changed the smallest boundary")
         assert(pane.relative_width and pane.relative_width.ratio == 0.5, "no-op snap cleared sticky relative target")
 
-        sidepanes.snap_width("next")
+        capture_notify(function()
+            sidepanes.snap_width("next")
+        end)
 
         assert(sidepanes.get_width() == 100, "next snap did not move to the absolute boundary")
         assert(pane.relative_width == nil, "absolute snap did not clear relative target")
 
-        sidepanes.snap_width("previous")
+        capture_notify(function()
+            sidepanes.snap_width("previous")
+        end)
 
         assert(sidepanes.get_width() == 80, "previous snap did not return to the prior boundary")
+    end)
+end)
+
+test("width picker selects common configured width points", function()
+    reset_pane()
+
+    with_options({ columns = 200, winminwidth = 1 }, function()
+        pane.setup({
+            width = 80,
+            sticky_relative_width = true,
+            width_snap_points = { 80, 100, 120 },
+            width_picker_points = { "1/4", "1/2", 120 },
+        })
+
+        pane._test_next_choice = "2"
+
+        local messages = capture_notify(function()
+            sidepanes.width_picker()
+        end)
+
+        assert(sidepanes.get_width() == 100, "width picker did not apply selected common point")
+        assert(pane.relative_width and pane.relative_width.ratio == 0.5, "width picker did not preserve relative target when sticky")
+        assert(has_notify(messages, "Sidepanes width: 1/2 (100 cols); previous 80 (80 cols); next 120"), "width picker did not notify selected and neighboring points")
     end)
 end)
 

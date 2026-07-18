@@ -24,6 +24,7 @@ local known_commands = {
     ipython_clear = true,
     focus = true,
     zoom = true,
+    width_picker = true,
     ask = true,
     ask_codex = true,
     ask_claude = true,
@@ -141,18 +142,23 @@ end
 
 --- Validate width snapping config shape.
 local function validate_layout(diagnostics, config)
-    if config.width_snap_points == nil then
-        return
-    end
+    local width_lists = {
+        width_snap_points = config.width_snap_points,
+        width_picker_points = config.width_picker_points,
+    }
 
-    if type(config.width_snap_points) ~= "table" then
-        warn(diagnostics, "Sidepanes config width_snap_points must be a table.")
-        return
-    end
+    for name, values in pairs(width_lists) do
+        if values ~= nil then
+            if type(values) ~= "table" then
+                warn(diagnostics, "Sidepanes config " .. name .. " must be a table.")
+            else
+                for index, value in ipairs(values) do
+                    if not valid_width_value(value) then
+                        warn(diagnostics, "Invalid Sidepanes " .. name .. " entry at index " .. index .. ": use a number or string.")
+                    end
+                end
+            end
 
-    for index, value in ipairs(config.width_snap_points) do
-        if not valid_width_value(value) then
-            warn(diagnostics, "Invalid Sidepanes width snap point at index " .. index .. ": use a number or string.")
         end
     end
 end

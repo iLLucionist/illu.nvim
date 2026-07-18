@@ -32,6 +32,8 @@ Recently completed or in progress:
 - `layout.width` accepts the same width units during setup.
 - `toggle_sticky_relative_width()` and `<leader>p%` toggle sticky relative width at runtime.
 - `snap_width(direction)` and `<leader>p-` / `<leader>p+` move to configured width snap points.
+- Width snapping reports the current, previous, and next snap points after use.
+- `width_picker()` / `<leader>pw` / `:SidepanesWidthPick` pick from configurable common width points.
 
 ## Roadmap
 
@@ -91,6 +93,8 @@ Completed decisions:
 - Use `<leader>p+` and `<leader>p-` for snapping to configured width boundaries.
 - Snapping understands columns, fractions, percentages, and numeric ratios.
 - Snapping cooperates with `layout.sticky_relative_width` by preserving relative snap targets when enabled.
+- Keep `width_picker_points` shorter than `width_snap_points` so the picker remains fast to read.
+- Use `<leader>pw`, `:SidepanesWidthPick`, and `:Sidepanes width-pick` for explicit width picking.
 
 ### 4. Docs Split
 
