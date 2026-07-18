@@ -181,6 +181,99 @@ test("pane-local slot maps switch between markdown, agents, and IPython", functi
     assert(vim.api.nvim_win_get_buf(pane.winid) == pane.bufnr, "space-0 did not restore markdown buffer")
 end)
 
+test("pane switch accepts string and terminal entry targets", function()
+    reset_pane()
+
+    local root = root_fixture("switch-target-test")
+
+    write(root .. "/docs/doc.md", { "# Doc" })
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = {
+                    { name = "default", label = "Default", args = {} },
+                    { name = "review", label = "Review", args = {} },
+                },
+            },
+        },
+    })
+    pane.open(root .. "/docs/doc.md")
+
+    pane.switch("codex")
+    assert(pane.active_mode == "codex", "string switch did not open Codex")
+
+    pane.switch({
+        kind = "terminal",
+        tool_name = "codex",
+        preset_name = "review",
+    })
+
+    local ctx = pane.terminals[next(pane.terminals)]
+
+    assert(ctx and ctx.tool_name == "codex", "terminal entry switch did not keep Codex")
+    assert(ctx.requested_preset and ctx.requested_preset.name == "review", "terminal entry switch did not request preset")
+end)
+
+test("pane switch picker selects markdown and shortcut entries without enter", function()
+    reset_pane()
+
+    local root = root_fixture("switch-picker-test")
+
+    write(root .. "/docs/doc.md", { "# Doc" })
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+            claude = {
+                label = "Claude",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+    pane.open(root .. "/docs/doc.md")
+
+    pane._test_next_choice = "x"
+    pane.switch_picker()
+    assert(pane.active_mode == "codex", "picker x did not switch to Codex")
+
+    pane._test_next_choice = "0"
+    pane.switch_picker()
+    assert(pane.active_mode == "markdown", "picker 0 did not switch to Markdown")
+    assert(vim.api.nvim_win_get_buf(pane.winid) == pane.bufnr, "picker 0 did not restore markdown buffer")
+end)
+
+test("toggle markdown agent flips between markdown and last coding agent", function()
+    reset_pane()
+
+    local root = root_fixture("toggle-agent-test")
+
+    write(root .. "/docs/doc.md", { "# Doc" })
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+    pane.open(root .. "/docs/doc.md")
+    pane.open_terminal("codex", nil, { root = root, focus = true })
+    pane.show_markdown()
+
+    pane.toggle_markdown_agent()
+    assert(pane.active_mode == "codex", "toggle did not return to last coding agent")
+
+    pane.toggle_markdown_agent()
+    assert(pane.active_mode == "markdown", "toggle did not return to markdown")
+end)
+
 test("public IPython send captures current line through terminal deps", function()
     reset_pane()
 

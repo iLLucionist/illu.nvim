@@ -6,6 +6,7 @@ local picker = require("markdown_pane.picker")
 local question = require("markdown_pane.question")
 local render = require("markdown_pane.render")
 local selection = require("markdown_pane.selection")
+local switcher = require("markdown_pane.switcher")
 local terminal = require("markdown_pane.terminal")
 local util = require("markdown_pane.util")
 local pane_window = require("markdown_pane.window")
@@ -206,6 +207,7 @@ local setup_pane_maps
 local window_deps
 local viewer_deps
 local render_deps
+local switcher_deps
 
 --- Apply pane-local window options for markdown or terminal mode.
 local function set_window_options(winid, mode)
@@ -413,54 +415,33 @@ function M.show_last_agent(opts)
     terminal.show_last_agent(M, terminal_deps(), opts)
 end
 
+--- Build switcher module callbacks that still belong to pane state.
+switcher_deps = function()
+    return {
+        numbered_select = numbered_select,
+        open_terminal = M.open_terminal,
+        pane_root = pane_root,
+        show_last_agent = M.show_last_agent,
+        show_markdown = M.show_markdown,
+        terminal_context_for_buf = terminal_context_for_buf,
+        terminal_entries = terminal_entries,
+        tool_shortcut_entries = tool_shortcut_entries,
+    }
+end
+
 --- Toggle between markdown view and the last coding-agent terminal.
 function M.toggle_markdown_agent()
-    if M.active_mode == "markdown" then
-        M.show_last_agent({ focus = true })
-    else
-        M.show_markdown()
-    end
+    switcher.toggle_markdown_agent(M, switcher_deps())
 end
 
 --- Switch the pane to markdown or a selected terminal entry.
 function M.switch(entry)
-    if entry == "markdown" or (type(entry) == "table" and entry.kind == "markdown") then
-        M.show_markdown()
-        return
-    end
-
-    if type(entry) == "string" then
-        M.open_terminal(entry)
-        return
-    end
-
-    if type(entry) == "table" and entry.kind == "terminal" then
-        M.open_terminal(entry.tool_name, entry.preset_name, { focus = M.config.focus_on_switch })
-    end
+    switcher.switch(M, switcher_deps(), entry)
 end
 
 --- Show the pane switcher picker.
 function M.switch_picker()
-    local bufnr = vim.api.nvim_get_current_buf()
-    local terminal_ctx = terminal_context_for_buf(bufnr)
-    local root = terminal_ctx and terminal_ctx.root or pane_root(bufnr)
-    local entries = {
-        {
-            kind = "markdown",
-            index = 0,
-            key = "0",
-            label = "Markdown Viewer",
-        },
-    }
-
-    vim.list_extend(entries, tool_shortcut_entries(root))
-    vim.list_extend(entries, terminal_entries(root, 1, { preset_tools_only = true }))
-
-    numbered_select("Switch pane", entries, function(choice)
-        if choice then
-            M.switch(choice)
-        end
-    end)
+    switcher.switch_picker(M, switcher_deps())
 end
 
 --- Send an ask prompt, switching model first when needed.
