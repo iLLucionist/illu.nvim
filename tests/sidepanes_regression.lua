@@ -7,6 +7,7 @@ local pane_context = require("sidepanes.context")
 local document_picker = require("sidepanes.document_picker")
 local entries = require("sidepanes.entries")
 local global_maps = require("sidepanes.global_maps")
+local health = require("sidepanes.health")
 local local_maps = require("sidepanes.maps")
 local presets = require("sidepanes.presets")
 local util = require("sidepanes.util")
@@ -105,6 +106,49 @@ local function wait_for_file(path, needle)
     end, 20)
 
     assert(ok, "did not find " .. needle .. " in " .. path .. ":\n" .. read_file(path))
+end
+
+local function capture_health(fn)
+    local original = vim.health
+    local reports = {}
+
+    vim.health = {
+        start = function(message)
+            table.insert(reports, { level = "start", message = message })
+        end,
+        ok = function(message)
+            table.insert(reports, { level = "ok", message = message })
+        end,
+        warn = function(message)
+            table.insert(reports, { level = "warn", message = message })
+        end,
+        error = function(message)
+            table.insert(reports, { level = "error", message = message })
+        end,
+        info = function(message)
+            table.insert(reports, { level = "info", message = message })
+        end,
+    }
+
+    local ok_call, err = pcall(fn, reports)
+
+    vim.health = original
+
+    if not ok_call then
+        error(err)
+    end
+
+    return reports
+end
+
+local function has_health_report(reports, level, needle)
+    for _, report in ipairs(reports) do
+        if report.level == level and report.message:find(needle, 1, true) then
+            return true
+        end
+    end
+
+    return false
 end
 
 local function reset_pane()
@@ -651,6 +695,113 @@ test("empty preset helpers match plugin default choices", function()
     assert(claude_preset.label == "Sonnet / normal", "empty Claude helper label was wrong")
     assert(claude_preset.model == "sonnet", "empty Claude helper model was wrong")
     assert(claude_preset.effort == "medium", "empty Claude helper effort was wrong")
+end)
+
+test("health check reports configured commands, mappings, and tools", function()
+    reset_pane()
+
+    local reports = capture_health(function()
+        health.check({
+            config = {
+                external_reflow_cmd = { "sh", "-c", "cat" },
+                external_reflow_fallback = true,
+                external_reflow_protect_tables = true,
+                commands = false,
+                mappings = {
+                    global = false,
+                    pane = {
+                        markdown = "<space>0",
+                    },
+                },
+                tools = {
+                    codex = {
+                        label = "Codex",
+                        cmd = "sh",
+                        exit_command = "/quit\r",
+                        presets = {
+                            { name = "default", label = "Default", args = {} },
+                        },
+                    },
+                    claude = {
+                        label = "Claude",
+                        cmd = "sh",
+                        exit_command = "/exit\r",
+                        presets = {
+                            { name = "default", label = "Default", args = {} },
+                        },
+                    },
+                    ipython = {
+                        label = "IPython",
+                        cmd = "sh",
+                        exit_command = "quit()\r",
+                        presets = {
+                            { name = "default", label = "Default", args = {} },
+                        },
+                    },
+                },
+            },
+        })
+    end)
+
+    assert(has_health_report(reports, "ok", "sidepanes.nvim loaded"), "health did not report plugin loaded")
+    assert(has_health_report(reports, "ok", "External reflow command found: sh"), "health did not find reflow command")
+    assert(has_health_report(reports, "ok", "Codex command found: sh"), "health did not find Codex command")
+    assert(has_health_report(reports, "ok", "Claude command found: sh"), "health did not find Claude command")
+    assert(has_health_report(reports, "ok", "IPython command found: sh"), "health did not find IPython command")
+    assert(has_health_report(reports, "info", "Sidepanes user commands are disabled."), "health did not report disabled commands")
+    assert(has_health_report(reports, "info", "Global mappings are disabled."), "health did not report disabled global mappings")
+    assert(has_health_report(reports, "ok", "Pane-local mapping config is present."), "health did not report pane mappings")
+end)
+
+test("health check reports malformed config", function()
+    local reports = capture_health(function()
+        health.check({
+            config = {
+                external_reflow_cmd = { "definitely_missing_sidepanes_reflow_cmd" },
+                external_reflow_fallback = false,
+                external_reflow_protect_tables = false,
+                commands = {
+                    toggle = true,
+                },
+                mappings = {
+                    global = {
+                        toggle = true,
+                    },
+                    pane = {
+                        markdown = true,
+                    },
+                },
+                tools = {
+                    codex = {
+                        label = "Codex",
+                        cmd = "definitely_missing_sidepanes_codex_cmd",
+                        presets = {},
+                    },
+                    claude = false,
+                    ipython = {
+                        label = "IPython",
+                        cmd = function()
+                            error("broken command")
+                        end,
+                        presets = {
+                            { name = "bad", args = "--bad" },
+                        },
+                    },
+                },
+            },
+        })
+    end)
+
+    assert(has_health_report(reports, "error", "External reflow command not found"), "health did not report missing reflow command")
+    assert(has_health_report(reports, "warn", "External reflow table protection is disabled."), "health did not report table protection warning")
+    assert(has_health_report(reports, "error", "Invalid command name for toggle"), "health did not report invalid command name")
+    assert(has_health_report(reports, "error", "Invalid global mapping for toggle"), "health did not report invalid global mapping")
+    assert(has_health_report(reports, "error", "Invalid pane mapping for markdown"), "health did not report invalid pane mapping")
+    assert(has_health_report(reports, "error", "Codex command not found"), "health did not report missing Codex command")
+    assert(has_health_report(reports, "error", "Codex has no presets configured."), "health did not report missing Codex presets")
+    assert(has_health_report(reports, "warn", "Tool disabled or missing: claude"), "health did not report disabled Claude")
+    assert(has_health_report(reports, "error", "IPython command function failed."), "health did not report failing IPython command function")
+    assert(has_health_report(reports, "error", "IPython preset bad has invalid args."), "health did not report invalid preset args")
 end)
 
 test("context identifies pane buffers and resolves pane roots", function()
