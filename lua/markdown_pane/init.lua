@@ -1,7 +1,11 @@
 local defaults = require("markdown_pane.defaults")
+local entries = require("markdown_pane.entries")
 local heading = require("markdown_pane.heading")
+local maps = require("markdown_pane.maps")
 local picker = require("markdown_pane.picker")
+local question = require("markdown_pane.question")
 local selection = require("markdown_pane.selection")
+local terminal = require("markdown_pane.terminal")
 local util = require("markdown_pane.util")
 
 local M = {
@@ -26,19 +30,12 @@ local sticky_heading_group = vim.api.nvim_create_augroup("MarkdownPaneStickyHead
 local focus_group = vim.api.nvim_create_augroup("MarkdownPaneFocus", { clear = true })
 local shutdown_group = vim.api.nvim_create_augroup("MarkdownPaneShutdown", { clear = true })
 
-local trim = util.trim
 local valid_win = util.valid_win
 local valid_buf = util.valid_buf
-local is_running = util.is_running
 local resolve_path = util.resolve_path
 local project_root = util.project_root
 local project_root_for_path = util.project_root_for_path
-local relative_path = util.relative_path
 local root_label = util.root_label
-local terminal_key = util.terminal_key
-local sanitize_name = util.sanitize_name
-local command_list = util.command_list
-local executable_exists = util.executable_exists
 local statusline_escape = heading.statusline_escape
 local truncate_display = heading.truncate_display
 local active_heading = heading.active_heading
@@ -90,103 +87,37 @@ end
 
 --- Find the pane terminal context for a buffer.
 local function terminal_context_for_buf(bufnr)
-    for _, ctx in pairs(M.terminals) do
-        if ctx.bufnr == bufnr then
-            return ctx
-        end
-    end
-
-    return nil
+    return terminal.context_for_buf(M, bufnr)
 end
 
 --- Return whether a terminal context still has a live job and buffer.
 local function terminal_is_running(ctx)
-    return ctx and valid_buf(ctx.bufnr) and is_running(ctx.job_id)
+    return terminal.is_running(ctx)
 end
 
 --- Return whether a tool is one of the conversational coding agents.
 local function is_coding_agent_tool(tool_name)
-    return tool_name == "codex" or tool_name == "claude"
+    return terminal.is_coding_agent_tool(tool_name)
 end
 
 --- Remember the latest active terminal and per-tool coding-agent terminal.
 local function remember_terminal_context(ctx)
-    if not ctx then
-        return
-    end
-
-    M.last_terminal_key = ctx.key
-
-    if is_coding_agent_tool(ctx.tool_name) then
-        M.last_coding_agent_terminal_key = ctx.key
-        M.last_tool_terminal_keys[ctx.tool_name] = ctx.key
-    end
+    terminal.remember_context(M, ctx)
 end
 
 --- Build a picker entry representing an already-running terminal context.
 local function entry_for_terminal_context(ctx)
-    local tool = (M.config.tools or {})[ctx.tool_name] or {}
-
-    return {
-        kind = "terminal",
-        tool_name = ctx.tool_name,
-        preset_name = ctx.preset_name,
-        root = ctx.root,
-        terminal_key = ctx.key,
-        label = (tool.label or ctx.tool_label or ctx.tool_name) .. " current: " .. (ctx.preset_label or ctx.preset_name or "Default"),
-        running = true,
-        current = true,
-        active = M.active_terminal_key == ctx.key,
-    }
+    return terminal.entry_for_context(M, ctx)
 end
 
 --- Find the best running terminal context for a tool and optional root.
 local function terminal_context_for_tool(tool_name, root)
-    local last_key = M.last_tool_terminal_keys and M.last_tool_terminal_keys[tool_name] or nil
-    local last_ctx = last_key and M.terminals[last_key] or nil
-
-    if last_ctx and last_ctx.tool_name == tool_name and terminal_is_running(last_ctx) then
-        return last_ctx
-    end
-
-    local root_ctx = root and M.terminals[terminal_key(tool_name, root)] or nil
-
-    if root_ctx and terminal_is_running(root_ctx) then
-        return root_ctx
-    end
-
-    for _, ctx in pairs(M.terminals or {}) do
-        if ctx.tool_name == tool_name and terminal_is_running(ctx) then
-            return ctx
-        end
-    end
-
-    return nil
+    return terminal.context_for_tool(M, tool_name, root)
 end
 
 --- Find the most recently used running Codex or Claude context.
 local function last_coding_agent_context(root)
-    local last_ctx = M.last_coding_agent_terminal_key and M.terminals[M.last_coding_agent_terminal_key] or nil
-
-    if last_ctx and is_coding_agent_tool(last_ctx.tool_name) and terminal_is_running(last_ctx) then
-        return last_ctx
-    end
-
-    local active_ctx = M.active_terminal_key and M.terminals[M.active_terminal_key] or nil
-
-    if active_ctx and is_coding_agent_tool(active_ctx.tool_name) and terminal_is_running(active_ctx) then
-        return active_ctx
-    end
-
-    for _, tool_name in ipairs({ "codex", "claude" }) do
-        local ctx = terminal_context_for_tool(tool_name, root)
-
-        if ctx then
-            return ctx
-        end
-    end
-
-    return nil
+    return terminal.last_coding_agent_context(M, root)
 end
 
 --- Resolve the default markdown file for the current working tree.
@@ -479,74 +410,21 @@ end
 
 --- Install pane-local mappings on a markdown or terminal pane buffer.
 setup_pane_maps = function(bufnr)
-    local function map(mode, lhs, rhs, desc, opts)
-        opts = opts or {}
-
-        vim.keymap.set(mode, lhs, rhs, {
-            buffer = bufnr,
-            desc = desc,
-            silent = true,
-            nowait = opts.nowait,
-        })
-    end
-
-    local function visual_opts()
-        return {
-            bufnr = bufnr,
-            visual = true,
-            visual_mode = vim.fn.mode(1),
-        }
-    end
-
-    map("n", "<space>0", function()
-        M.show_markdown()
-    end, "Show markdown pane", { nowait = true })
-
-    map("n", "<space>x", function()
-        M.open_terminal("codex", nil, { root = pane_root(bufnr), focus = true })
-    end, "Show Codex pane", { nowait = true })
-
-    map("n", "<space>c", function()
-        M.open_terminal("claude", nil, { root = pane_root(bufnr), focus = true })
-    end, "Show Claude pane", { nowait = true })
-
-    map("n", "<space>i", function()
-        M.open_terminal("ipython", nil, { root = pane_root(bufnr), focus = true })
-    end, "Show IPython pane", { nowait = true })
-
-    map("n", "<leader>gg", function()
-        M.toggle_markdown_agent()
-    end, "Toggle markdown/agent pane")
-
-    map("n", "<C-g>", function()
-        M.toggle_markdown_agent()
-    end, "Toggle markdown/agent pane")
-
-    map("n", "<leader>gi", function()
-        M.open_terminal("ipython", nil, { root = pane_root(bufnr), focus = true })
-    end, "Show IPython pane")
-
-    map("n", "gf", function()
-        require("smart_gf").open()
-    end, "Smart go to file from pane")
-
-    map("x", "aa", function()
-        M.ask_last_coding_agent(visual_opts())
-    end, "Ask last coding agent")
-
-    map("x", "ax", function()
-        M.ask_current_coding_agent("codex", visual_opts())
-    end, "Ask current Codex pane")
-
-    map("x", "ac", function()
-        M.ask_current_coding_agent("claude", visual_opts())
-    end, "Ask current Claude pane")
-
-    if bufnr == M.bufnr then
-        map("n", M.config.wrap_toggle_key, function()
-            M.toggle_wrap()
-        end, "Toggle markdown pane wrap")
-    end
+    maps.setup(bufnr, {
+        ask_current_coding_agent = M.ask_current_coding_agent,
+        ask_last_coding_agent = M.ask_last_coding_agent,
+        markdown_bufnr = function()
+            return M.bufnr
+        end,
+        open_terminal = M.open_terminal,
+        pane_root = pane_root,
+        show_markdown = M.show_markdown,
+        toggle_markdown_agent = M.toggle_markdown_agent,
+        toggle_wrap = M.toggle_wrap,
+        wrap_toggle_key = function()
+            return M.config.wrap_toggle_key
+        end,
+    })
 end
 
 --- Create or reuse the side pane window for a buffer and mode.
@@ -848,274 +726,39 @@ end
 
 --- Resolve a configured preset by name, label, or default position.
 local function preset_by_name(tool, preset_name)
-    local presets = tool.presets or {}
-
-    if not preset_name and presets[1] then
-        return presets[1]
-    end
-
-    for _, preset in ipairs(presets) do
-        if preset.name == preset_name or preset.label == preset_name then
-            return preset
-        end
-    end
-
-    return presets[1] or { name = "default", label = "Default", args = {} }
-end
-
---- Return configured tool names in stable picker order.
-local function ordered_tool_names()
-    local tools = M.config.tools or {}
-    local names = {}
-    local seen = {}
-
-    for _, name in ipairs({ "codex", "claude", "ipython" }) do
-        if tools[name] then
-            table.insert(names, name)
-            seen[name] = true
-        end
-    end
-
-    local rest = {}
-
-    for name in pairs(tools) do
-        if not seen[name] then
-            table.insert(rest, name)
-        end
-    end
-
-    table.sort(rest)
-    vim.list_extend(names, rest)
-
-    return names
-end
-
---- Build the quick x/c/i picker entry for a tool.
-local function current_or_default_entry(tool_name, root, key)
-    local tool = (M.config.tools or {})[tool_name]
-
-    if not tool then
-        return nil
-    end
-
-    local terminal_ctx = root and M.terminals[terminal_key(tool_name, root)] or nil
-    local running = terminal_is_running(terminal_ctx)
-    local preset = running and preset_by_name(tool, terminal_ctx.preset_name) or preset_by_name(tool)
-
-    return {
-        kind = "terminal",
-        shortcut = true,
-        tool_name = tool_name,
-        preset_name = preset.name,
-        key = key,
-        label = (tool.label or tool_name) .. " current: " .. (preset.label or preset.name or "Default"),
-        running = running,
-        current = running,
-        active = running and M.active_terminal_key == terminal_ctx.key,
-    }
+    return entries.preset_by_name(tool, preset_name)
 end
 
 --- Build quick picker entries for Codex, Claude, and optionally IPython.
 local function tool_shortcut_entries(root, opts)
-    opts = opts or {}
-
-    local entries = {}
-    local codex = current_or_default_entry("codex", root, "x")
-    local claude = current_or_default_entry("claude", root, "c")
-    local ipython = nil
-
-    if not opts.ask_only then
-        ipython = current_or_default_entry("ipython", root, "i")
-    end
-
-    if codex then
-        table.insert(entries, codex)
-    end
-
-    if claude then
-        table.insert(entries, claude)
-    end
-
-    if ipython then
-        table.insert(entries, ipython)
-    end
-
-    return entries
+    return entries.tool_shortcut_entries(M, root, opts)
 end
 
 --- Build numbered picker entries for configured terminal presets.
 local function terminal_entries(root, start_index, opts)
-    opts = opts or {}
-
-    local entries = {}
-    local index = start_index or 1
-
-    for _, tool_name in ipairs(ordered_tool_names()) do
-        local tool = M.config.tools[tool_name]
-
-        if (not opts.ask_only or tool.ask ~= false) and not (opts.preset_tools_only and tool.ask == false) then
-            for _, preset in ipairs(tool.presets or { { name = "default", label = "Default", args = {} } }) do
-                table.insert(entries, {
-                    kind = "terminal",
-                    tool_name = tool_name,
-                    preset_name = preset.name,
-                    label = (tool.label or tool_name) .. ": " .. (preset.label or preset.name or "Default"),
-                    ordinal = (tool.label or tool_name) .. " " .. (preset.label or preset.name or "Default"),
-                })
-            end
-        end
-    end
-
-    for _, entry in ipairs(entries) do
-        entry.index = index
-        entry.key = tostring(index)
-
-        if root then
-            local key = terminal_key(entry.tool_name, root)
-            local ctx = M.terminals[key]
-
-            entry.terminal_key = key
-            entry.session_running = terminal_is_running(ctx)
-            entry.current = entry.session_running and ctx.preset_name == entry.preset_name
-            entry.running = entry.current
-            entry.active = entry.current and M.active_terminal_key == key
-        end
-
-        index = index + 1
-    end
-
-    return entries
+    return entries.terminal_entries(M, root, start_index, opts)
 end
 
---- Start a new pane-owned terminal job for a tool and project root.
-local function start_terminal(tool_name, preset_name, root)
-    local tool = (M.config.tools or {})[tool_name]
-
-    if not tool then
-        vim.notify("Unknown pane tool: " .. tostring(tool_name), vim.log.levels.ERROR)
-        return nil
-    end
-
-    local preset = preset_by_name(tool, preset_name)
-    local key = terminal_key(tool_name, root)
-    local existing = M.terminals[key]
-
-    if existing and valid_buf(existing.bufnr) and is_running(existing.job_id) then
-        return existing, false
-    end
-
-    local cmd = command_list(tool, preset, root)
-
-    if not executable_exists(cmd[1]) then
-        vim.notify("Pane tool executable not found: " .. tostring(cmd[1]), vim.log.levels.ERROR)
-        return nil
-    end
-
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    local ctx = {
-        key = key,
-        tool_name = tool_name,
-        tool_label = tool.label or tool_name,
-        preset_name = preset.name or "default",
-        preset_label = preset.label or preset.name or "Default",
-        preset = preset,
-        root = root,
-        bufnr = bufnr,
-        job_id = nil,
-        send_delay_ms = tool.send_delay_ms or 700,
+--- Build terminal module callbacks that still belong to pane/window state.
+local function terminal_deps()
+    return {
+        ensure_win = ensure_win,
+        pane_root = pane_root,
+        save_markdown_view = save_markdown_view,
+        selection_context = selection_context,
+        setup_pane_maps = setup_pane_maps,
+        update_sticky_heading = update_sticky_heading,
     }
-
-    pcall(vim.api.nvim_buf_set_name, bufnr, "Pane://" .. sanitize_name(key))
-    vim.api.nvim_set_option_value("bufhidden", "hide", { buf = bufnr })
-    setup_pane_maps(bufnr)
-
-    M.active_mode = tool_name
-    M.active_terminal_key = key
-    remember_terminal_context(ctx)
-    ensure_win(bufnr, "terminal", { focus = false })
-
-    vim.api.nvim_win_call(M.winid, function()
-        vim.api.nvim_set_current_buf(bufnr)
-        ctx.job_id = vim.fn.termopen(cmd, {
-            cwd = root,
-            on_exit = function()
-                update_sticky_heading()
-            end,
-        })
-    end)
-
-    if not ctx.job_id or ctx.job_id <= 0 then
-        vim.notify("Could not start pane tool: " .. table.concat(cmd, " "), vim.log.levels.ERROR)
-        return nil
-    end
-
-    M.terminals[key] = ctx
-
-    return ctx, true
 end
 
 --- Open or focus a pane terminal, reusing an existing session when possible.
 function M.open_terminal(tool_name, preset_name, opts)
-    opts = opts or {}
-
-    if M.active_mode == "markdown" then
-        save_markdown_view()
-    end
-
-    local root = opts.root or pane_root(opts.bufnr or vim.api.nvim_get_current_buf())
-    local tool = (M.config.tools or {})[tool_name]
-
-    if not tool then
-        vim.notify("Unknown pane tool: " .. tostring(tool_name), vim.log.levels.ERROR)
-        return nil
-    end
-
-    local preset = preset_by_name(tool, preset_name)
-    local key = terminal_key(tool_name, root)
-    local ctx = M.terminals[key]
-    local started = false
-
-    if not (ctx and valid_buf(ctx.bufnr) and is_running(ctx.job_id)) then
-        ctx, started = start_terminal(tool_name, preset.name, root)
-    end
-
-    if not ctx then
-        return nil
-    end
-
-    ctx.requested_preset = preset
-    M.active_mode = tool_name
-    M.active_terminal_key = ctx.key
-    remember_terminal_context(ctx)
-    setup_pane_maps(ctx.bufnr)
-    ensure_win(ctx.bufnr, "terminal", { focus = opts.focus == nil and M.config.focus_on_switch or opts.focus })
-    update_sticky_heading()
-
-    return ctx, started
+    return terminal.open(M, terminal_deps(), tool_name, preset_name, opts)
 end
 
 --- Show the most recently used coding-agent terminal.
 function M.show_last_agent(opts)
-    opts = opts or {}
-
-    local ctx = M.last_terminal_key and M.terminals[M.last_terminal_key] or nil
-
-    if ctx and valid_buf(ctx.bufnr) and is_running(ctx.job_id) then
-        M.open_terminal(ctx.tool_name, ctx.preset_name, {
-            root = ctx.root,
-            focus = opts.focus == nil and M.config.focus_on_switch or opts.focus,
-        })
-        return
-    end
-
-    local root = opts.root or pane_root(vim.api.nvim_get_current_buf())
-    local tool_name = ctx and ctx.tool_name or "codex"
-    local preset_name = ctx and ctx.preset_name or nil
-
-    M.open_terminal(tool_name, preset_name, {
-        root = root,
-        focus = opts.focus == nil and M.config.focus_on_switch or opts.focus,
-    })
+    terminal.show_last_agent(M, terminal_deps(), opts)
 end
 
 --- Toggle between markdown view and the last coding-agent terminal.
@@ -1177,680 +820,99 @@ local function selection_context(opts)
     })
 end
 
-local format_prompt = selection.format_prompt
-local prompt_template = selection.prompt_template
-
---- Format the in-terminal command that switches a running tool preset.
-local function format_switch_command(tool, preset)
-    if not tool or not preset then
-        return nil
-    end
-
-    local template = preset.switch_command or tool.switch_command
-
-    if type(template) == "function" then
-        return template(preset, tool)
-    end
-
-    if type(template) ~= "string" or template == "" then
-        return nil
-    end
-
-    local values = {
-        model = preset.model or preset.name or "",
-        effort = preset.effort or "",
-        speed = preset.speed or "normal",
-        label = preset.label or preset.name or "",
-        name = preset.name or "",
-    }
-
-    return (template:gsub("{([%w_]+)}", function(key)
-        return values[key] or ""
-    end):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", ""))
-end
-
---- Send text to a terminal job using bracketed paste.
-local function send_to_terminal(ctx, prompt, started)
-    local delay = started and ctx.send_delay_ms or 50
-
-    vim.defer_fn(function()
-        if not is_running(ctx.job_id) then
-            vim.notify(ctx.tool_label .. " terminal is not running", vim.log.levels.ERROR)
-            return
-        end
-
-        vim.fn.chansend(ctx.job_id, "\27[200~" .. prompt .. "\27[201~\r")
-    end, delay)
-end
-
 --- Send an ask prompt, switching model first when needed.
 local function send_prompt_to_terminal(ctx, entry, prompt, started)
-    local tool = (M.config.tools or {})[ctx.tool_name]
-    local preset = tool and preset_by_name(tool, entry and entry.preset_name or ctx.preset_name) or ctx.preset
-    local needs_switch = not started and preset and ctx.preset_name ~= preset.name
-    local switch_command = needs_switch and format_switch_command(tool, preset) or nil
-
-    if switch_command and switch_command ~= "" then
-        vim.defer_fn(function()
-            if not is_running(ctx.job_id) then
-                vim.notify(ctx.tool_label .. " terminal is not running", vim.log.levels.ERROR)
-                return
-            end
-
-            vim.fn.chansend(ctx.job_id, switch_command .. "\r")
-        end, 50)
-    end
-
-    if preset then
-        ctx.preset = preset
-        ctx.preset_name = preset.name or "default"
-        ctx.preset_label = preset.label or preset.name or "Default"
-    end
-
-    local prompt_delay = switch_command and 350 or nil
-
-    if prompt_delay then
-        vim.defer_fn(function()
-            send_to_terminal(ctx, prompt, false)
-        end, prompt_delay)
-    else
-        send_to_terminal(ctx, prompt, started)
-    end
-end
-
---- Resolve the project root used for IPython operations.
-local function ipython_root(opts)
-    opts = opts or {}
-
-    return opts.root or pane_root(opts.bufnr or vim.api.nvim_get_current_buf())
+    terminal.send_prompt(M, ctx, entry, prompt, started)
 end
 
 --- Open or focus the IPython pane terminal.
 function M.open_ipython(opts)
-    opts = opts or {}
-
-    return M.open_terminal("ipython", nil, {
-        root = ipython_root(opts),
-        bufnr = opts.bufnr,
-        focus = opts.focus,
-    })
+    return terminal.open_ipython(M, terminal_deps(), opts)
 end
 
 --- Send the current line or selection to IPython.
 function M.send_ipython(opts)
-    opts = opts or {}
-
-    local context = selection_context(opts)
-
-    if not context then
-        return
-    end
-
-    local ctx, started = M.open_terminal("ipython", nil, {
-        root = context.root,
-        bufnr = context.bufnr,
-        focus = opts.focus == true,
-    })
-
-    if ctx then
-        send_to_terminal(ctx, context.text, started)
-    end
+    terminal.send_ipython(M, terminal_deps(), opts)
 end
 
 --- Clear the running IPython terminal screen.
 function M.clear_ipython(opts)
-    opts = opts or {}
-
-    local root = ipython_root(opts)
-    local ctx = M.terminals[terminal_key("ipython", root)]
-
-    if not (ctx and valid_buf(ctx.bufnr) and is_running(ctx.job_id)) then
-        vim.notify("No IPython pane running for " .. root_label(root), vim.log.levels.WARN)
-        return
-    end
-
-    vim.fn.chansend(ctx.job_id, "\12")
+    terminal.clear_ipython(M, terminal_deps(), opts)
 end
 
 --- Restart the IPython pane terminal for the current root.
 function M.restart_ipython(opts)
-    opts = opts or {}
-
-    local root = ipython_root(opts)
-    local key = terminal_key("ipython", root)
-    local ctx = M.terminals[key]
-
-    if ctx then
-        if is_running(ctx.job_id) then
-            pcall(vim.fn.jobstop, ctx.job_id)
-        end
-
-        if valid_buf(ctx.bufnr) then
-            pcall(vim.api.nvim_buf_delete, ctx.bufnr, { force = true })
-        end
-
-        M.terminals[key] = nil
-    end
-
-    return M.open_terminal("ipython", nil, {
-        root = root,
-        bufnr = opts.bufnr,
-        focus = opts.focus == nil or opts.focus,
-    })
-end
-
---- Resolve the polite shutdown command for a terminal context.
-local function terminal_shutdown_command(ctx)
-    local tool = (M.config.tools or {})[ctx.tool_name]
-
-    if not tool then
-        return nil
-    end
-
-    local command = tool.shutdown_command or tool.exit_command
-
-    if type(command) == "function" then
-        command = command(ctx, tool)
-    end
-
-    return command
-end
-
---- Resolve the shutdown timeout for a terminal context.
-local function terminal_shutdown_timeout(ctx, opts)
-    local tool = (M.config.tools or {})[ctx.tool_name] or {}
-
-    return opts.timeout_ms or tool.shutdown_timeout_ms or M.config.shutdown_timeout_ms or 300
-end
-
---- Gracefully stop one terminal, then force-stop if needed.
-local function shutdown_terminal(ctx, opts)
-    opts = opts or {}
-
-    if not (ctx and ctx.job_id and is_running(ctx.job_id)) then
-        return
-    end
-
-    local timeout = terminal_shutdown_timeout(ctx, opts)
-    local command = terminal_shutdown_command(ctx)
-
-    if command and command ~= "" then
-        pcall(vim.fn.chansend, ctx.job_id, command)
-        vim.wait(timeout, function()
-            return not is_running(ctx.job_id)
-        end, 20)
-    end
-
-    if is_running(ctx.job_id) then
-        pcall(vim.fn.jobstop, ctx.job_id)
-        vim.wait(timeout, function()
-            return not is_running(ctx.job_id)
-        end, 20)
-    end
+    return terminal.restart_ipython(M, terminal_deps(), opts)
 end
 
 --- Shut down all pane-owned terminal sessions.
 function M.shutdown_terminals(opts)
-    opts = opts or {}
-
-    for key, ctx in pairs(M.terminals or {}) do
-        shutdown_terminal(ctx, opts)
-
-        if not is_running(ctx.job_id) then
-            M.terminals[key] = nil
-        end
-    end
+    terminal.shutdown_terminals(M, opts)
 end
 
---- Capture enough pane/window state to restore after question editing.
-local function capture_origin()
-    local winid = vim.api.nvim_get_current_win()
-    local bufnr = vim.api.nvim_get_current_buf()
-    local cursor = { 1, 0 }
-    local view = nil
-
-    pcall(function()
-        cursor = vim.api.nvim_win_get_cursor(winid)
-    end)
-
-    pcall(function()
-        view = vim.fn.winsaveview()
-    end)
-
+--- Build question-editor callbacks that still belong to pane/window state.
+local function question_deps()
     return {
-        winid = winid,
-        bufnr = bufnr,
-        cursor = cursor,
-        view = view,
-        pane_active_mode = M.active_mode,
-        pane_active_terminal_key = M.active_terminal_key,
+        entry_for_terminal_context = entry_for_terminal_context,
+        is_coding_agent_tool = is_coding_agent_tool,
+        last_coding_agent_context = last_coding_agent_context,
+        numbered_select = numbered_select,
+        open_terminal = M.open_terminal,
+        preset_by_name = preset_by_name,
+        selection_context = selection_context,
+        send_prompt_to_terminal = send_prompt_to_terminal,
+        set_window_options = set_window_options,
+        statusline_escape = statusline_escape,
+        terminal_context_for_tool = terminal_context_for_tool,
+        terminal_entries = terminal_entries,
+        tool_shortcut_entries = tool_shortcut_entries,
+        update_sticky_heading = update_sticky_heading,
     }
-end
-
---- Restore focus and pane state after closing a question editor.
-local function restore_origin(origin)
-    if not origin or not valid_win(origin.winid) then
-        return
-    end
-
-    if origin.winid == M.winid then
-        M.active_mode = origin.pane_active_mode
-        M.active_terminal_key = origin.pane_active_terminal_key
-
-        if valid_buf(origin.bufnr) then
-            if not pcall(vim.api.nvim_win_set_buf, origin.winid, origin.bufnr) then
-                pcall(vim.cmd, "hide")
-                pcall(vim.api.nvim_win_set_buf, origin.winid, origin.bufnr)
-            end
-        end
-
-        set_window_options(origin.winid, M.active_mode == "markdown" and "markdown" or "terminal")
-        update_sticky_heading()
-    elseif valid_buf(origin.bufnr) then
-        if not pcall(vim.api.nvim_win_set_buf, origin.winid, origin.bufnr) then
-            pcall(vim.cmd, "hide")
-            pcall(vim.api.nvim_win_set_buf, origin.winid, origin.bufnr)
-        end
-    end
-
-    pcall(vim.api.nvim_set_current_win, origin.winid)
-
-    if origin.view then
-        pcall(vim.fn.winrestview, origin.view)
-    else
-        pcall(vim.api.nvim_win_set_cursor, origin.winid, origin.cursor)
-    end
-end
-
---- Open the editable ask prompt scratch buffer.
-local function open_question_buffer(entry, context, origin)
-    origin = origin or capture_origin()
-
-    local scratch = vim.api.nvim_create_buf(false, true)
-    local augroup = vim.api.nvim_create_augroup("MarkdownPaneQuestion" .. scratch, { clear = true })
-    local scratch_win = nil
-    local sent = false
-    local state = {
-        entry = entry,
-        written_prompt = nil,
-    }
-    local initial_prompt = prompt_template(context)
-
-    pcall(vim.api.nvim_buf_set_name, scratch, "Pane Question://" .. sanitize_name(entry.label))
-    vim.api.nvim_set_option_value("buftype", "acwrite", { buf = scratch })
-    vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = scratch })
-    vim.api.nvim_set_option_value("swapfile", false, { buf = scratch })
-    vim.api.nvim_set_option_value("filetype", "markdown", { buf = scratch })
-    vim.api.nvim_buf_set_lines(scratch, 0, -1, false, vim.split(initial_prompt, "\n", { plain = true }))
-    vim.api.nvim_set_option_value("modified", false, { buf = scratch })
-
-    local width = math.max(50, math.floor(vim.o.columns * 0.78))
-    local height = math.max(12, math.floor(vim.o.lines * 0.72))
-
-    local function target_label()
-        return state.entry and state.entry.label or entry.label
-    end
-
-    local function update_prompt_chrome()
-        if not valid_win(scratch_win) then
-            return
-        end
-
-        local title = " Question for " .. target_label() .. " "
-        local footer = " M/<Tab>: model  :wq send  :w draft  :q cancel  target: " .. target_label() .. " "
-
-        pcall(vim.api.nvim_win_set_config, scratch_win, {
-            title = title,
-            title_pos = "center",
-            footer = footer,
-            footer_pos = "center",
-        })
-        vim.api.nvim_set_option_value("winbar", "%#WinBar# " .. statusline_escape("Question target: " .. target_label()) .. " %*", { win = scratch_win })
-    end
-
-    scratch_win = vim.api.nvim_open_win(scratch, true, {
-        relative = "editor",
-        row = math.max(0, math.floor((vim.o.lines - height) / 2) - 1),
-        col = math.max(0, math.floor((vim.o.columns - width) / 2)),
-        width = width,
-        height = height,
-        style = "minimal",
-        border = "single",
-        title = " Question for " .. target_label() .. " ",
-        title_pos = "center",
-        footer = " M/<Tab>: model  :wq send  :w draft  :q cancel  target: " .. target_label() .. " ",
-        footer_pos = "center",
-    })
-
-    pcall(vim.api.nvim_win_set_cursor, scratch_win, { 2, 0 })
-    update_prompt_chrome()
-
-    local function buffer_prompt()
-        return trim(table.concat(vim.api.nvim_buf_get_lines(scratch, 0, -1, false), "\n"))
-    end
-
-    local function close_scratch()
-        if valid_win(scratch_win) then
-            pcall(vim.api.nvim_win_close, scratch_win, true)
-        end
-
-        if valid_buf(scratch) then
-            pcall(vim.api.nvim_buf_delete, scratch, { force = true })
-        end
-    end
-
-    local function cancel(opts)
-        opts = opts or {}
-
-        if sent then
-            return
-        end
-
-        sent = true
-        vim.api.nvim_set_option_value("modified", false, { buf = scratch })
-        restore_origin(origin)
-
-        if not opts.from_wipeout then
-            close_scratch()
-        end
-    end
-
-    local function finish(opts)
-        opts = opts or {}
-
-        if sent then
-            return
-        end
-
-        local has_unwritten_changes = valid_buf(scratch) and vim.api.nvim_get_option_value("modified", { buf = scratch })
-
-        if has_unwritten_changes then
-            cancel(opts)
-            return
-        end
-
-        local prompt = state.written_prompt
-
-        if not prompt or prompt == trim(initial_prompt) then
-            cancel(opts)
-            return
-        end
-
-        if prompt == "" then
-            vim.notify("Empty prompt; ask cancelled", vim.log.levels.INFO)
-            cancel(opts)
-            return
-        end
-
-        sent = true
-        vim.api.nvim_set_option_value("modified", false, { buf = scratch })
-        restore_origin(origin)
-
-        local current_entry = state.entry or entry
-        local ctx, started = M.open_terminal(current_entry.tool_name, current_entry.preset_name, {
-            bufnr = context.bufnr,
-            root = current_entry.root or context.root,
-            focus = true,
-        })
-
-        if ctx then
-            send_prompt_to_terminal(ctx, current_entry, prompt, started)
-        end
-
-        if not opts.from_wipeout then
-            close_scratch()
-        end
-    end
-
-    local function write_prompt()
-        if sent then
-            return
-        end
-
-        state.written_prompt = buffer_prompt()
-        vim.api.nvim_set_option_value("modified", false, { buf = scratch })
-    end
-
-    state.cancel = cancel
-    state.finish = finish
-    state.write_prompt = write_prompt
-    M.question_buffers[scratch] = state
-
-    local function change_target()
-        local entries = tool_shortcut_entries(context.root, { ask_only = true })
-
-        vim.list_extend(entries, terminal_entries(context.root, 1, { ask_only = true }))
-
-        numbered_select("Question target", entries, function(choice)
-            if choice then
-                state.entry = choice
-                update_prompt_chrome()
-
-                if valid_win(scratch_win) then
-                    vim.api.nvim_set_current_win(scratch_win)
-                end
-            end
-        end)
-    end
-
-    state.change_target = change_target
-
-    local function commandline_enter()
-        local line = trim(vim.fn.getcmdline())
-
-        if line == "q" or line == "q!" or line == "quit" or line == "quit!" then
-            return vim.api.nvim_replace_termcodes(
-                '<C-u>lua require("markdown_pane").finish_question(' .. scratch .. ')<CR>',
-                true,
-                false,
-                true
-            )
-        end
-
-        if line == "wq" or line == "wq!" or line == "x" or line == "xit" or line == "exit" then
-            return vim.api.nvim_replace_termcodes(
-                '<C-u>lua require("markdown_pane").write_question(' .. scratch .. '); require("markdown_pane").finish_question(' .. scratch .. ')<CR>',
-                true,
-                false,
-                true
-            )
-        end
-
-        return vim.api.nvim_replace_termcodes("<CR>", true, false, true)
-    end
-
-    vim.keymap.set("c", "<CR>", commandline_enter, { buffer = scratch, expr = true, silent = true })
-    vim.keymap.set("n", "q", finish, { buffer = scratch, silent = true, desc = "Finish pane question" })
-    vim.keymap.set("n", "M", function()
-        M.change_question_target(scratch)
-    end, { buffer = scratch, silent = true, desc = "Change pane question target" })
-    vim.keymap.set("n", "<Tab>", function()
-        M.change_question_target(scratch)
-    end, { buffer = scratch, silent = true, desc = "Change pane question target" })
-
-    vim.api.nvim_create_autocmd("BufWriteCmd", {
-        group = augroup,
-        buffer = scratch,
-        callback = function()
-            if sent then
-                return
-            end
-
-            write_prompt()
-            vim.notify("Question written. Quit to send.", vim.log.levels.INFO)
-        end,
-    })
-
-    vim.api.nvim_create_autocmd("BufWipeout", {
-        group = augroup,
-        buffer = scratch,
-        callback = function()
-            if not sent then
-                finish({ from_wipeout = true })
-            end
-
-            M.question_buffers[scratch] = nil
-            pcall(vim.api.nvim_del_augroup_by_id, augroup)
-        end,
-    })
-
-    vim.cmd("startinsert")
 end
 
 --- Cancel and close a question editor buffer.
 function M.cancel_question(bufnr)
-    bufnr = bufnr or vim.api.nvim_get_current_buf()
-
-    local state = M.question_buffers[bufnr]
-
-    if state and state.cancel then
-        state.cancel()
-    end
+    question.cancel(M, bufnr)
 end
 
 --- Finish a question editor, sending only after a write.
 function M.finish_question(bufnr)
-    bufnr = bufnr or vim.api.nvim_get_current_buf()
-
-    local state = M.question_buffers[bufnr]
-
-    if state and state.finish then
-        state.finish()
-    end
+    question.finish(M, bufnr)
 end
 
 --- Mark a question editor as written and update its cached prompt.
 function M.write_question(bufnr)
-    bufnr = bufnr or vim.api.nvim_get_current_buf()
-
-    local state = M.question_buffers[bufnr]
-
-    if state and state.write_prompt then
-        state.write_prompt()
-    end
+    question.write(M, bufnr)
 end
 
 --- Open the target picker from inside a question editor.
 function M.change_question_target(bufnr)
-    bufnr = bufnr or vim.api.nvim_get_current_buf()
-
-    local state = M.question_buffers[bufnr]
-
-    if state and state.change_target then
-        state.change_target()
-    end
-end
-
---- Open the ask target picker for an already-captured context.
-local function open_ask_target_picker(context, origin)
-    local entries = tool_shortcut_entries(context.root, { ask_only = true })
-
-    vim.list_extend(entries, terminal_entries(context.root, 1, { ask_only = true }))
-
-    numbered_select("Ask", entries, function(choice)
-        if choice then
-            M.ask_with_entry(choice, { context = context, origin = origin })
-        end
-    end)
+    question.change_target(M, bufnr)
 end
 
 --- Ask a specific picker entry using a captured or fresh context.
 function M.ask_with_entry(entry, opts)
-    opts = opts or {}
-
-    if not entry or entry.kind ~= "terminal" then
-        return
-    end
-
-    local context = opts.context or selection_context(opts)
-
-    if not context then
-        return
-    end
-
-    open_question_buffer(entry, context, opts.origin)
+    question.ask_with_entry(M, question_deps(), entry, opts)
 end
 
 --- Capture selection and ask via the target picker.
 function M.ask_picker(opts)
-    opts = opts or {}
-
-    local origin = capture_origin()
-    local context = selection_context(opts)
-
-    if not context then
-        return
-    end
-
-    open_ask_target_picker(context, origin)
+    question.ask_picker(M, question_deps(), opts)
 end
 
 --- Ask the most recently used Codex or Claude terminal.
 function M.ask_last_coding_agent(opts)
-    opts = opts or {}
-
-    local origin = capture_origin()
-    local context = selection_context(opts)
-
-    if not context then
-        return
-    end
-
-    local ctx = last_coding_agent_context(context.root)
-
-    if not ctx then
-        open_ask_target_picker(context, origin)
-        return
-    end
-
-    M.ask_with_entry(entry_for_terminal_context(ctx), { context = context, origin = origin })
+    question.ask_last_coding_agent(M, question_deps(), opts)
 end
 
 --- Ask the current/default terminal for a specific coding agent.
 function M.ask_current_coding_agent(tool_name, opts)
-    opts = opts or {}
-
-    if not is_coding_agent_tool(tool_name) then
-        vim.notify("Unknown coding agent pane: " .. tostring(tool_name), vim.log.levels.ERROR)
-        return
-    end
-
-    local origin = capture_origin()
-    local context = selection_context(opts)
-
-    if not context then
-        return
-    end
-
-    local ctx = terminal_context_for_tool(tool_name, context.root)
-
-    if not ctx then
-        open_ask_target_picker(context, origin)
-        return
-    end
-
-    M.ask_with_entry(entry_for_terminal_context(ctx), { context = context, origin = origin })
+    question.ask_current_coding_agent(M, question_deps(), tool_name, opts)
 end
 
 --- Ask a specific tool and optional preset.
 function M.ask(tool_name, preset_name, opts)
-    opts = opts or {}
-
-    local tool = (M.config.tools or {})[tool_name]
-
-    if not tool then
-        vim.notify("Unknown pane tool: " .. tostring(tool_name), vim.log.levels.ERROR)
-        return
-    end
-
-    local preset = preset_by_name(tool, preset_name)
-
-    M.ask_with_entry({
-        kind = "terminal",
-        tool_name = tool_name,
-        preset_name = preset.name,
-        label = (tool.label or tool_name) .. ": " .. (preset.label or preset.name or "Default"),
-    }, opts)
+    question.ask(M, question_deps(), tool_name, preset_name, opts)
 end
 
 --- Pick a markdown document and open it in the pane.
