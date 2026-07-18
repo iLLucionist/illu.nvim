@@ -713,6 +713,27 @@ map('x', '<leader>pa', function()
         visual_mode = vim.fn.mode(1),
     })
 end, {})
+map('x', 'aa', function()
+    markdown_pane.ask_last_coding_agent({
+        bufnr = vim.api.nvim_get_current_buf(),
+        visual = true,
+        visual_mode = vim.fn.mode(1),
+    })
+end, { desc = "Ask last coding agent" })
+map('x', 'ax', function()
+    markdown_pane.ask_current_coding_agent("codex", {
+        bufnr = vim.api.nvim_get_current_buf(),
+        visual = true,
+        visual_mode = vim.fn.mode(1),
+    })
+end, { desc = "Ask current Codex pane" })
+map('x', 'ac', function()
+    markdown_pane.ask_current_coding_agent("claude", {
+        bufnr = vim.api.nvim_get_current_buf(),
+        visual = true,
+        visual_mode = vim.fn.mode(1),
+    })
+end, { desc = "Ask current Claude pane" })
 
 local markdown_reflow = require("markdown_reflow")
 
@@ -730,8 +751,50 @@ map('n', '<leader>mR', function()
 end, {})
 
 local fb_actions = require("telescope").extensions.file_browser.actions
+local telescope_action_state = require("telescope.actions.state")
+
+local function selected_telescope_text(entry)
+    if not entry then
+        return nil
+    end
+
+    local value = entry.path or entry.filename or entry.value or entry[1] or entry.ordinal
+
+    if type(value) == "table" and value.path then
+        value = value.path
+    end
+
+    if type(value) ~= "string" or value == "" then
+        return nil
+    end
+
+    return value
+end
+
+local function copy_telescope_selection()
+    local text = selected_telescope_text(telescope_action_state.get_selected_entry())
+
+    if not text then
+        vim.notify("No Telescope selection to copy", vim.log.levels.WARN)
+        return
+    end
+
+    vim.fn.setreg('"', text)
+    pcall(vim.fn.setreg, "+", text)
+    vim.notify("Copied: " .. text, vim.log.levels.INFO)
+end
 
 require("telescope").setup({
+    defaults = {
+        mappings = {
+            i = {
+                ["<C-y>"] = copy_telescope_selection,
+            },
+            n = {
+                ["<C-y>"] = copy_telescope_selection,
+            },
+        },
+    },
     extensions = {
         file_browser = {
             hijack_netrw = true,

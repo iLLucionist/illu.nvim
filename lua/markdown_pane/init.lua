@@ -6,6 +6,8 @@ local M = {
     active_mode = "markdown",
     active_terminal_key = nil,
     last_terminal_key = nil,
+    last_coding_agent_terminal_key = nil,
+    last_tool_terminal_keys = {},
     last_focus_win = nil,
     zoomed = false,
     markdown_view = nil,
@@ -357,6 +359,90 @@ end
 local function terminal_context_for_buf(bufnr)
     for _, ctx in pairs(M.terminals) do
         if ctx.bufnr == bufnr then
+            return ctx
+        end
+    end
+
+    return nil
+end
+
+local function terminal_is_running(ctx)
+    return ctx and valid_buf(ctx.bufnr) and is_running(ctx.job_id)
+end
+
+local function is_coding_agent_tool(tool_name)
+    return tool_name == "codex" or tool_name == "claude"
+end
+
+local function remember_terminal_context(ctx)
+    if not ctx then
+        return
+    end
+
+    M.last_terminal_key = ctx.key
+
+    if is_coding_agent_tool(ctx.tool_name) then
+        M.last_coding_agent_terminal_key = ctx.key
+        M.last_tool_terminal_keys[ctx.tool_name] = ctx.key
+    end
+end
+
+local function entry_for_terminal_context(ctx)
+    local tool = (M.config.tools or {})[ctx.tool_name] or {}
+
+    return {
+        kind = "terminal",
+        tool_name = ctx.tool_name,
+        preset_name = ctx.preset_name,
+        root = ctx.root,
+        terminal_key = ctx.key,
+        label = (tool.label or ctx.tool_label or ctx.tool_name) .. " current: " .. (ctx.preset_label or ctx.preset_name or "Default"),
+        running = true,
+        current = true,
+        active = M.active_terminal_key == ctx.key,
+    }
+end
+
+local function terminal_context_for_tool(tool_name, root)
+    local last_key = M.last_tool_terminal_keys and M.last_tool_terminal_keys[tool_name] or nil
+    local last_ctx = last_key and M.terminals[last_key] or nil
+
+    if last_ctx and last_ctx.tool_name == tool_name and terminal_is_running(last_ctx) then
+        return last_ctx
+    end
+
+    local root_ctx = root and M.terminals[terminal_key(tool_name, root)] or nil
+
+    if root_ctx and terminal_is_running(root_ctx) then
+        return root_ctx
+    end
+
+    for _, ctx in pairs(M.terminals or {}) do
+        if ctx.tool_name == tool_name and terminal_is_running(ctx) then
+            return ctx
+        end
+    end
+
+    return nil
+end
+
+local function last_coding_agent_context(root)
+    local last_ctx = M.last_coding_agent_terminal_key and M.terminals[M.last_coding_agent_terminal_key] or nil
+
+    if last_ctx and is_coding_agent_tool(last_ctx.tool_name) and terminal_is_running(last_ctx) then
+        return last_ctx
+    end
+
+    local active_ctx = M.active_terminal_key and M.terminals[M.active_terminal_key] or nil
+
+    if active_ctx and is_coding_agent_tool(active_ctx.tool_name) and terminal_is_running(active_ctx) then
+        return active_ctx
+    end
+
+    for _, tool_name in ipairs({ "codex", "claude" }) do
+        local ctx = terminal_context_for_tool(tool_name, root)
+
+        if ctx then
             return ctx
         end
     end
@@ -779,10 +865,10 @@ local function pane_root(bufnr)
 end
 
 setup_pane_maps = function(bufnr)
-    local function map(lhs, rhs, desc, opts)
+    local function map(mode, lhs, rhs, desc, opts)
         opts = opts or {}
 
-        vim.keymap.set("n", lhs, rhs, {
+        vim.keymap.set(mode, lhs, rhs, {
             buffer = bufnr,
             desc = desc,
             silent = true,
@@ -790,40 +876,60 @@ setup_pane_maps = function(bufnr)
         })
     end
 
-    map("<space>0", function()
+    local function visual_opts()
+        return {
+            bufnr = bufnr,
+            visual = true,
+            visual_mode = vim.fn.mode(1),
+        }
+    end
+
+    map("n", "<space>0", function()
         M.show_markdown()
     end, "Show markdown pane", { nowait = true })
 
-    map("<space>x", function()
+    map("n", "<space>x", function()
         M.open_terminal("codex", nil, { root = pane_root(bufnr), focus = true })
     end, "Show Codex pane", { nowait = true })
 
-    map("<space>c", function()
+    map("n", "<space>c", function()
         M.open_terminal("claude", nil, { root = pane_root(bufnr), focus = true })
     end, "Show Claude pane", { nowait = true })
 
-    map("<space>i", function()
+    map("n", "<space>i", function()
         M.open_terminal("ipython", nil, { root = pane_root(bufnr), focus = true })
     end, "Show IPython pane", { nowait = true })
 
-    map("<leader>gg", function()
+    map("n", "<leader>gg", function()
         M.toggle_markdown_agent()
     end, "Toggle markdown/agent pane")
 
-    map("<C-g>", function()
+    map("n", "<C-g>", function()
         M.toggle_markdown_agent()
     end, "Toggle markdown/agent pane")
 
-    map("<leader>gi", function()
+    map("n", "<leader>gi", function()
         M.open_terminal("ipython", nil, { root = pane_root(bufnr), focus = true })
     end, "Show IPython pane")
 
-    map("gf", function()
+    map("n", "gf", function()
         require("smart_gf").open()
     end, "Smart go to file from pane")
 
+    map("x", "aa", function()
+        M.ask_last_coding_agent(visual_opts())
+    end, "Ask last coding agent")
+
+    map("x", "ax", function()
+        M.ask_current_coding_agent("codex", visual_opts())
+    end, "Ask current Codex pane")
+
+    map("x", "ac", function()
+        M.ask_current_coding_agent("claude", visual_opts())
+    end, "Ask current Claude pane")
+
     if bufnr == M.bufnr then
-        map(M.config.wrap_toggle_key, function()
+        map("n", M.config.wrap_toggle_key, function()
             M.toggle_wrap()
         end, "Toggle markdown pane wrap")
     end
@@ -979,7 +1085,7 @@ function M.show_markdown()
     local previous = vim.api.nvim_get_current_win()
 
     if M.active_terminal_key then
-        M.last_terminal_key = M.active_terminal_key
+        remember_terminal_context(M.terminals[M.active_terminal_key])
     end
 
     M.active_mode = "markdown"
@@ -1164,7 +1270,7 @@ local function current_or_default_entry(tool_name, root, key)
     end
 
     local terminal_ctx = root and M.terminals[terminal_key(tool_name, root)] or nil
-    local running = terminal_ctx and valid_buf(terminal_ctx.bufnr) and is_running(terminal_ctx.job_id)
+    local running = terminal_is_running(terminal_ctx)
     local preset = running and preset_by_name(tool, terminal_ctx.preset_name) or preset_by_name(tool)
 
     return {
@@ -1238,7 +1344,7 @@ local function terminal_entries(root, start_index, opts)
             local ctx = M.terminals[key]
 
             entry.terminal_key = key
-            entry.session_running = ctx and valid_buf(ctx.bufnr) and is_running(ctx.job_id)
+            entry.session_running = terminal_is_running(ctx)
             entry.current = entry.session_running and ctx.preset_name == entry.preset_name
             entry.running = entry.current
             entry.active = entry.current and M.active_terminal_key == key
@@ -1450,7 +1556,7 @@ local function start_terminal(tool_name, preset_name, root)
 
     M.active_mode = tool_name
     M.active_terminal_key = key
-    M.last_terminal_key = key
+    remember_terminal_context(ctx)
     ensure_win(bufnr, "terminal", { focus = false })
 
     vim.api.nvim_win_call(M.winid, function()
@@ -1504,7 +1610,7 @@ function M.open_terminal(tool_name, preset_name, opts)
     ctx.requested_preset = preset
     M.active_mode = tool_name
     M.active_terminal_key = ctx.key
-    M.last_terminal_key = ctx.key
+    remember_terminal_context(ctx)
     setup_pane_maps(ctx.bufnr)
     ensure_win(ctx.bufnr, "terminal", { focus = opts.focus == nil and M.config.focus_on_switch or opts.focus })
     update_sticky_heading()
@@ -2115,7 +2221,7 @@ local function open_question_buffer(entry, context, origin)
         local current_entry = state.entry or entry
         local ctx, started = M.open_terminal(current_entry.tool_name, current_entry.preset_name, {
             bufnr = context.bufnr,
-            root = context.root,
+            root = current_entry.root or context.root,
             focus = true,
         })
 
@@ -2263,6 +2369,18 @@ function M.change_question_target(bufnr)
     end
 end
 
+local function open_ask_target_picker(context, origin)
+    local entries = tool_shortcut_entries(context.root, { ask_only = true })
+
+    vim.list_extend(entries, terminal_entries(context.root, 1, { ask_only = true }))
+
+    numbered_select("Ask", entries, function(choice)
+        if choice then
+            M.ask_with_entry(choice, { context = context, origin = origin })
+        end
+    end)
+end
+
 function M.ask_with_entry(entry, opts)
     opts = opts or {}
 
@@ -2289,15 +2407,52 @@ function M.ask_picker(opts)
         return
     end
 
-    local entries = tool_shortcut_entries(context.root, { ask_only = true })
+    open_ask_target_picker(context, origin)
+end
 
-    vim.list_extend(entries, terminal_entries(context.root, 1, { ask_only = true }))
+function M.ask_last_coding_agent(opts)
+    opts = opts or {}
 
-    numbered_select("Ask", entries, function(choice)
-        if choice then
-            M.ask_with_entry(choice, { context = context, origin = origin })
-        end
-    end)
+    local origin = capture_origin()
+    local context = selection_context(opts)
+
+    if not context then
+        return
+    end
+
+    local ctx = last_coding_agent_context(context.root)
+
+    if not ctx then
+        open_ask_target_picker(context, origin)
+        return
+    end
+
+    M.ask_with_entry(entry_for_terminal_context(ctx), { context = context, origin = origin })
+end
+
+function M.ask_current_coding_agent(tool_name, opts)
+    opts = opts or {}
+
+    if not is_coding_agent_tool(tool_name) then
+        vim.notify("Unknown coding agent pane: " .. tostring(tool_name), vim.log.levels.ERROR)
+        return
+    end
+
+    local origin = capture_origin()
+    local context = selection_context(opts)
+
+    if not context then
+        return
+    end
+
+    local ctx = terminal_context_for_tool(tool_name, context.root)
+
+    if not ctx then
+        open_ask_target_picker(context, origin)
+        return
+    end
+
+    M.ask_with_entry(entry_for_terminal_context(ctx), { context = context, origin = origin })
 end
 
 function M.ask(tool_name, preset_name, opts)
