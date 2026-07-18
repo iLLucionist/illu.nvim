@@ -969,6 +969,81 @@ test("toggle wrap updates markdown window wrap options", function()
     assert(vim.api.nvim_get_option_value("breakindent", { win = pane.winid }) == false, "breakindent was not disabled")
 end)
 
+test("markdown winbar shows current heading and zoom state", function()
+    reset_pane()
+
+    local root = root_fixture("winbar-markdown-test")
+
+    write(root .. "/docs/doc.md", {
+        "# Top",
+        "",
+        "body",
+        "## Details",
+        "",
+        "more body",
+    })
+    pane.setup({
+        auto_reflow = false,
+        sticky_heading = true,
+    })
+    pane.open(root .. "/docs/doc.md")
+    pane.focus_toggle()
+    vim.api.nvim_win_set_cursor(pane.winid, { 4, 0 })
+    vim.api.nvim_win_call(pane.winid, function()
+        vim.cmd("normal! zt")
+    end)
+
+    vim.cmd("doautocmd CursorMoved")
+
+    local winbar = vim.api.nvim_get_option_value("winbar", { win = pane.winid })
+
+    assert(winbar:find("Markdown: ## Details", 1, true), winbar)
+
+    pane.toggle_zoom()
+
+    winbar = vim.api.nvim_get_option_value("winbar", { win = pane.winid })
+
+    assert(winbar:find("[zoom]", 1, true), winbar)
+end)
+
+test("terminal winbar shows tool preset and root", function()
+    reset_pane()
+
+    local root = root_fixture("winbar-terminal-test")
+
+    write(root .. "/docs/doc.md", { "# Doc" })
+    pane.setup({
+        sticky_heading = true,
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+    pane.open(root .. "/docs/doc.md")
+    pane.open_terminal("codex", nil, { root = root, focus = true })
+
+    local winbar = vim.api.nvim_get_option_value("winbar", { win = pane.winid })
+
+    assert(winbar:find("Codex: Default - " .. vim.fn.fnamemodify(root, ":t"), 1, true), winbar)
+end)
+
+test("disabled sticky heading clears pane winbar", function()
+    reset_pane()
+
+    local root = root_fixture("winbar-disabled-test")
+
+    write(root .. "/docs/doc.md", { "# Doc" })
+    pane.setup({
+        sticky_heading = false,
+    })
+    pane.open(root .. "/docs/doc.md")
+
+    assert(vim.api.nvim_get_option_value("winbar", { win = pane.winid }) == "", "winbar was not cleared")
+end)
+
 test("pane reflow preserves readonly modifiable and modified flags", function()
     reset_pane()
 

@@ -12,6 +12,7 @@ local terminal = require("markdown_pane.terminal")
 local util = require("markdown_pane.util")
 local pane_window = require("markdown_pane.window")
 local viewer = require("markdown_pane.viewer")
+local winbar = require("markdown_pane.winbar")
 
 local M = {
     winid = nil,
@@ -39,10 +40,7 @@ local valid_win = util.valid_win
 local valid_buf = util.valid_buf
 local project_root = util.project_root
 local project_root_for_path = util.project_root_for_path
-local root_label = util.root_label
 local statusline_escape = heading.statusline_escape
-local truncate_display = heading.truncate_display
-local active_heading = heading.active_heading
 
 --- Show a numbered/lettered picker and pass the selected entry to a callback.
 local function numbered_select(prompt, entries, callback)
@@ -130,72 +128,14 @@ local function restore_markdown_view()
     viewer.restore_view(M)
 end
 
---- Build the winbar title for the active terminal pane.
-local function terminal_winbar_title()
-    local ctx = M.active_terminal_key and M.terminals[M.active_terminal_key] or nil
-
-    if not ctx then
-        return "Pane"
-    end
-
-    return ctx.tool_label .. ": " .. ctx.preset_label .. " - " .. root_label(ctx.root)
-end
-
 --- Refresh the pane winbar for markdown heading or terminal identity.
 local function update_sticky_heading()
-    if not valid_win(M.winid) then
-        return
-    end
-
-    if not M.config.sticky_heading then
-        vim.api.nvim_set_option_value("winbar", "", { win = M.winid })
-        return
-    end
-
-    if M.active_mode ~= "markdown" then
-        local max_width = math.max(10, vim.api.nvim_win_get_width(M.winid) - 4)
-        local title = terminal_winbar_title()
-
-        if M.zoomed then
-            title = title .. " [zoom]"
-        end
-
-        local label = truncate_display(title, max_width)
-
-        vim.api.nvim_set_option_value("winbar", "%#WinBar# " .. statusline_escape(label) .. " %*", { win = M.winid })
-        return
-    end
-
-    local level, title = active_heading(M.winid)
-
-    if not title then
-        title = M.source and vim.fn.fnamemodify(M.source, ":t") or "Markdown Pane"
-    else
-        title = string.rep("#", level) .. " " .. title
-    end
-
-    title = "Markdown: " .. title
-
-    if M.zoomed then
-        title = title .. " [zoom]"
-    end
-
-    local max_width = math.max(10, vim.api.nvim_win_get_width(M.winid) - 4)
-    local label = truncate_display(title, max_width)
-
-    vim.api.nvim_set_option_value("winbar", "%#WinBar# " .. statusline_escape(label) .. " %*", { win = M.winid })
+    winbar.update(M)
 end
 
 --- Install autocmds that keep the sticky heading current.
 local function setup_sticky_heading_autocmds()
-    vim.api.nvim_create_autocmd({ "WinScrolled", "WinResized", "BufWinEnter", "CursorMoved" }, {
-        group = sticky_heading_group,
-        callback = function()
-            if M.is_open() then
-                update_sticky_heading()
-            end
-        end,
-    })
+    winbar.setup_autocmds(M, sticky_heading_group)
 end
 
 --- Create or return the markdown viewer buffer.
