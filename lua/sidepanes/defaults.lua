@@ -22,6 +22,7 @@ M.config = {
     focus_on_ask = true,
     shutdown_on_exit = true,
     shutdown_timeout_ms = 300,
+    validate = true,
     commands = false,
     mappings = {
         global = false,

@@ -6,6 +6,7 @@ Architecture: Reads the public sidepanes config as a diagnostic layer without ow
 ]]
 
 local util = require("sidepanes.util")
+local dependencies = require("sidepanes.dependencies")
 
 local M = {}
 
@@ -166,6 +167,12 @@ local function check_dependencies()
     check_module("markview", "markview", false)
     check_module("telescope", "telescope.nvim", false)
     check_module("smart_gf", "smart_gf", false)
+
+    if dependencies.has_parser("markdown") then
+        ok("Treesitter markdown parser found")
+    else
+        warn("Treesitter markdown parser not found", "Install it for :SidepanesHeadings and the headings mapping.")
+    end
 end
 
 --- Return command names from a boolean or table command config.

@@ -6,6 +6,7 @@ Architecture: Keeps markdown navigation UI outside init.lua while receiving the 
 ]]
 
 local M = {}
+local dependencies = require("sidepanes.dependencies")
 
 local heading_icons = {
     [1] = "󰉫",
@@ -164,6 +165,15 @@ end
 
 --- Show a Telescope picker for markdown headings.
 function M.pick(state)
+    local origin_win = vim.api.nvim_get_current_win()
+    local pane_visible = state.is_open()
+    local bufnr = pane_visible and state.bufnr or vim.api.nvim_get_current_buf()
+    local target_win = pane_visible and state.winid or origin_win
+
+    if dependencies.notify_missing("heading_picker", { bufnr = bufnr }) then
+        return
+    end
+
     local pickers = require("telescope.pickers")
     local finders = require("telescope.finders")
     local entry_display_module = require("telescope.pickers.entry_display")
@@ -171,10 +181,6 @@ function M.pick(state)
     local conf = require("telescope.config").values
     local actions = require("telescope.actions")
     local action_state = require("telescope.actions.state")
-    local origin_win = vim.api.nvim_get_current_win()
-    local pane_visible = state.is_open()
-    local bufnr = pane_visible and state.bufnr or vim.api.nvim_get_current_buf()
-    local target_win = pane_visible and state.winid or origin_win
     local headings, err = M.collect(bufnr)
 
     if not headings then

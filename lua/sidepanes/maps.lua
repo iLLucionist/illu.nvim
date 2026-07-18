@@ -6,6 +6,7 @@ Architecture: Receives behavior through dependency callbacks from init.lua so ma
 ]]
 
 local M = {}
+local dependencies = require("sidepanes.dependencies")
 
 --- Install one buffer-local pane mapping.
 local function map(bufnr, mode, lhs, rhs, desc, opts)
@@ -75,6 +76,10 @@ function M.setup(bufnr, deps)
     end, "Show IPython pane")
 
     map(bufnr, "n", mappings.gf, function()
+        if dependencies.notify_missing("smart_gf") then
+            return
+        end
+
         require("smart_gf").open()
     end, "Smart go to file from pane")
 

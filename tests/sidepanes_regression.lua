@@ -3,6 +3,7 @@ vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 local defaults = require("sidepanes.defaults")
 local commands = require("sidepanes.commands")
 local config = require("sidepanes.config")
+local dependencies = require("sidepanes.dependencies")
 local pane_context = require("sidepanes.context")
 local document_picker = require("sidepanes.document_picker")
 local entries = require("sidepanes.entries")
@@ -13,6 +14,7 @@ local local_maps = require("sidepanes.maps")
 local nvim_tree_integration = require("sidepanes.integrations.nvim_tree")
 local presets = require("sidepanes.presets")
 local util = require("sidepanes.util")
+local validation = require("sidepanes.validation")
 local markdown_reflow = require("markdown_reflow")
 local pane = require("sidepanes")
 
@@ -108,6 +110,35 @@ local function wait_for_file(path, needle)
     end, 20)
 
     assert(ok, "did not find " .. needle .. " in " .. path .. ":\n" .. read_file(path))
+end
+
+local function capture_notify(fn)
+    local original = vim.notify
+    local messages = {}
+
+    vim.notify = function(message, level)
+        table.insert(messages, { message = message, level = level })
+    end
+
+    local ok_call, err = pcall(fn, messages)
+
+    vim.notify = original
+
+    if not ok_call then
+        error(err)
+    end
+
+    return messages
+end
+
+local function has_notify(messages, needle)
+    for _, item in ipairs(messages) do
+        if item.message:find(needle, 1, true) then
+            return true
+        end
+    end
+
+    return false
 end
 
 local function capture_health(fn)
@@ -834,6 +865,7 @@ test("health check reports configured commands, mappings, and tools", function()
     assert(has_health_report(reports, "ok", "Codex command found: sh"), "health did not find Codex command")
     assert(has_health_report(reports, "ok", "Claude command found: sh"), "health did not find Claude command")
     assert(has_health_report(reports, "ok", "IPython command found: sh"), "health did not find IPython command")
+    assert(has_health_report(reports, "ok", "Treesitter markdown parser found"), "health did not check markdown parser")
     assert(has_health_report(reports, "info", "Sidepanes user commands are disabled."), "health did not report disabled commands")
     assert(has_health_report(reports, "info", "Global mappings are disabled."), "health did not report disabled global mappings")
     assert(has_health_report(reports, "ok", "Pane-local mapping config is present."), "health did not report pane mappings")
@@ -888,6 +920,186 @@ test("health check reports malformed config", function()
     assert(has_health_report(reports, "warn", "Tool disabled or missing: claude"), "health did not report disabled Claude")
     assert(has_health_report(reports, "error", "IPython command function failed."), "health did not report failing IPython command function")
     assert(has_health_report(reports, "error", "IPython preset bad has invalid args."), "health did not report invalid preset args")
+end)
+
+test("setup validation reports malformed config and implied dependency gaps", function()
+    local original_missing = dependencies.missing
+
+    dependencies.missing = function(feature_name)
+        if feature_name == "heading_picker" then
+            return { "Treesitter markdown parser" }
+        elseif feature_name == "document_picker" then
+            return { "telescope.nvim" }
+        elseif feature_name == "smart_gf" then
+            return { "smart_gf" }
+        end
+
+        return {}
+    end
+
+    local diagnostics = validation.diagnostics({
+        commands = {
+            pick = "SidepanesPick",
+            headings = "SidepanesHeadings",
+            bogus = "Nope",
+            zoom = true,
+        },
+        mappings = {
+            global = {
+                pick = "<leader>p",
+                headings = "<leader>h",
+                zoom = true,
+            },
+            pane = {
+                gf = "gf",
+                markdown = true,
+            },
+        },
+        tools = {
+            broken = {
+                cmd = "definitely_missing_sidepanes_validation_cmd",
+                presets = {},
+            },
+        },
+    })
+
+    dependencies.missing = original_missing
+
+    local messages = vim.tbl_map(function(item)
+        return item.message
+    end, diagnostics)
+    local joined = table.concat(messages, "\n")
+
+    assert(joined:find("Unknown Sidepanes command config key: bogus", 1, true), joined)
+    assert(joined:find("Invalid Sidepanes command config for zoom", 1, true), joined)
+    assert(joined:find("Invalid Sidepanes global mapping for zoom", 1, true), joined)
+    assert(joined:find("Invalid Sidepanes pane mapping for markdown", 1, true), joined)
+    assert(joined:find("Sidepanes dependency missing for document picker: telescope.nvim", 1, true), joined)
+    assert(joined:find("Sidepanes dependency missing for markdown headings: Treesitter markdown parser", 1, true), joined)
+    assert(joined:find("Sidepanes dependency missing for smart gf: smart_gf", 1, true), joined)
+    assert(joined:find("Sidepanes tool executable not found for broken", 1, true), joined)
+    assert(joined:find("Sidepanes tool has no presets configured: broken", 1, true), joined)
+end)
+
+test("setup validation can be disabled", function()
+    local messages = capture_notify(function()
+        validation.notify({
+            validate = false,
+            commands = {
+                zoom = true,
+            },
+            tools = {
+                broken = {
+                    cmd = "definitely_missing_sidepanes_validation_cmd",
+                    presets = {},
+                },
+            },
+        })
+    end)
+
+    assert(#messages == 0, "validation emitted notifications despite validate=false")
+end)
+
+test("pane setup emits validation warnings", function()
+    reset_pane()
+
+    local original_missing = dependencies.missing
+
+    dependencies.missing = function(feature_name)
+        if feature_name == "document_picker" then
+            return { "telescope.nvim" }
+        end
+
+        return {}
+    end
+
+    local messages = capture_notify(function()
+        pane.setup({
+            commands = {
+                pick = "SidepanesPick",
+            },
+            tools = {
+                codex = false,
+                claude = false,
+                ipython = false,
+            },
+        })
+    end)
+
+    dependencies.missing = original_missing
+
+    assert(has_notify(messages, "Sidepanes dependency missing for document picker: telescope.nvim"), "setup did not emit dependency validation warning")
+end)
+
+test("runtime dependency guards stop feature commands gracefully", function()
+    local original_notify_missing = dependencies.notify_missing
+    local calls = {}
+
+    dependencies.notify_missing = function(feature_name)
+        table.insert(calls, feature_name)
+        return true
+    end
+
+    document_picker.pick(function()
+        error("document picker callback should not run when dependency is missing")
+    end)
+    heading_picker.pick({
+        is_open = function()
+            return false
+        end,
+    })
+
+    local bufnr = vim.api.nvim_create_buf(false, true)
+
+    local_maps.setup(bufnr, {
+        ask_current_coding_agent = function() end,
+        ask_last_coding_agent = function() end,
+        markdown_bufnr = function()
+            return bufnr
+        end,
+        open_terminal = function() end,
+        pane_mappings = function()
+            return {
+                gf = "gf",
+            }
+        end,
+        pane_root = function()
+            return vim.fn.getcwd()
+        end,
+        show_markdown = function() end,
+        toggle_markdown_agent = function() end,
+        toggle_wrap = function() end,
+        wrap_toggle_key = function()
+            return false
+        end,
+    })
+    call_map(bufnr, "gf")
+
+    dependencies.notify_missing = original_notify_missing
+
+    assert(vim.tbl_contains(calls, "document_picker"), "document picker did not check dependencies")
+    assert(vim.tbl_contains(calls, "heading_picker"), "heading picker did not check dependencies")
+    assert(vim.tbl_contains(calls, "smart_gf"), "smart gf map did not check dependencies")
+end)
+
+test("runtime dependency warning names missing parser", function()
+    local original_missing = dependencies.missing
+
+    dependencies.missing = function(feature_name)
+        if feature_name == "heading_picker" then
+            return { "Treesitter markdown parser" }
+        end
+
+        return {}
+    end
+
+    local messages = capture_notify(function()
+        assert(dependencies.notify_missing("heading_picker") == true, "heading dependency guard did not stop")
+    end)
+
+    dependencies.missing = original_missing
+
+    assert(has_notify(messages, "Sidepanes dependency missing for markdown headings: Treesitter markdown parser"), "missing parser warning was not clear")
 end)
 
 test("context identifies pane buffers and resolves pane roots", function()

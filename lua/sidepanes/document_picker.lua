@@ -6,6 +6,7 @@ Architecture: Keeps document discovery and Telescope wiring outside the public f
 ]]
 
 local util = require("sidepanes.util")
+local dependencies = require("sidepanes.dependencies")
 
 local M = {}
 
@@ -54,6 +55,10 @@ end
 
 --- Pick a markdown document and pass the selected path to a callback.
 function M.pick(on_select)
+    if dependencies.notify_missing("document_picker") then
+        return
+    end
+
     local pickers = require("telescope.pickers")
     local finders = require("telescope.finders")
     local conf = require("telescope.config").values

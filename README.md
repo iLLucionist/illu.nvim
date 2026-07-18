@@ -63,6 +63,8 @@ Set `commands = true` to register the default `:Sidepanes*` and `:Pane*` command
 
 Run `:checkhealth sidepanes` to inspect external commands, optional dependencies, tool presets, command registration, and mapping configuration.
 
+Sidepanes also runs lightweight setup validation by default. It warns for malformed command/mapping/tool config and for dependencies implied by enabled features, such as `telescope.nvim` for document/headings pickers, the Markdown Treesitter parser for headings, and `smart_gf` for pane-local `gf`. Set `validate = false` to silence setup-time validation. Runtime feature entry points still fail gracefully with a dependency-specific warning when a required dependency is missing.
+
 Standalone Markdown reflow commands and mappings are configured through `markdown_reflow`:
 
 ```lua

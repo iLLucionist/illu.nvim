@@ -6,12 +6,14 @@ Architecture: Keeps autocmd setup separate from init.lua while delegating user-f
 ]]
 
 local config = require("sidepanes.config")
+local validation = require("sidepanes.validation")
 
 local M = {}
 
 --- Merge user configuration and install pane lifecycle autocmds.
 function M.setup(state, groups, deps, opts)
     state.config = config.normalize(state.config, opts or {})
+    validation.notify(state.config)
 
     vim.api.nvim_clear_autocmds({ group = groups.focus })
     vim.api.nvim_create_autocmd("WinEnter", {
