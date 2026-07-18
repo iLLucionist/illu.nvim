@@ -1,6 +1,7 @@
 vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
 local defaults = require("markdown_pane.defaults")
+local pane_context = require("markdown_pane.context")
 local document_picker = require("markdown_pane.document_picker")
 local entries = require("markdown_pane.entries")
 local markdown_reflow = require("markdown_reflow")
@@ -176,6 +177,86 @@ test("setup installs single focus and shutdown autocmds when repeated", function
     assert(pane.config.width == 61, "setup lost earlier config merge")
     assert(pane.config.wrap == true, "setup did not merge later config")
     assert(pane.config.tools.codex ~= nil, "setup dropped default tools")
+end)
+
+test("context identifies pane buffers and resolves pane roots", function()
+    reset_pane()
+
+    local root = root_fixture("context-root-test")
+    local other = root_fixture("context-other-root-test")
+
+    write(root .. "/docs/doc.md", { "# Doc", "", "body" })
+    write(other .. "/src/normal.py", { "print('normal')" })
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+    pane.open(root .. "/docs/doc.md")
+
+    local normal_buf = vim.fn.bufadd(other .. "/src/normal.py")
+
+    vim.fn.bufload(normal_buf)
+
+    local ctx = pane.open_terminal("codex", nil, { root = root, focus = false })
+
+    assert(pane_context.is_pane_buf(pane, pane.bufnr), "markdown pane buffer was not identified")
+    assert(pane_context.is_pane_buf(pane, ctx.bufnr), "terminal pane buffer was not identified")
+    assert(not pane_context.is_pane_buf(pane, normal_buf), "normal buffer was identified as pane buffer")
+    assert(pane_context.pane_root(pane, pane.bufnr) == root, "markdown pane root did not use source")
+    assert(pane_context.pane_root(pane, ctx.bufnr) == root, "terminal pane root did not use terminal context")
+    assert(pane_context.pane_root(pane, normal_buf) == vim.fn.fnamemodify(other, ":p"), "normal buffer root was wrong")
+end)
+
+test("context selection metadata uses markdown source and terminal identity", function()
+    reset_pane()
+
+    local root = root_fixture("context-selection-test")
+
+    write(root .. "/docs/doc.md", {
+        "# Doc",
+        "",
+        "```python",
+        "value = 42",
+        "```",
+    })
+    pane.setup({})
+    pane.open(root .. "/docs/doc.md")
+
+    local markdown_context = pane_context.selection_context(pane, {
+        bufnr = pane.bufnr,
+        line1 = 4,
+        line2 = 4,
+    })
+
+    assert(markdown_context.file == "docs/doc.md", markdown_context.file)
+    assert(markdown_context.root == root, markdown_context.root)
+    assert(markdown_context.snippet_filetype == "python", markdown_context.snippet_filetype)
+
+    local terminal_buf = vim.api.nvim_create_buf(false, true)
+
+    vim.api.nvim_buf_set_lines(terminal_buf, 0, -1, false, { "Traceback line" })
+
+    pane.terminals.fake = {
+        bufnr = terminal_buf,
+        root = root,
+        tool_label = "Codex",
+        preset_label = "Default",
+    }
+
+    local terminal_context = pane_context.selection_context(pane, {
+        bufnr = terminal_buf,
+        line1 = 1,
+        line2 = 1,
+    })
+
+    assert(terminal_context.file == "Terminal: Codex / Default", terminal_context.file)
+    assert(terminal_context.root == root, terminal_context.root)
+    assert(terminal_context.text == "Traceback line", terminal_context.text)
 end)
 
 test("pane-local slot maps switch between markdown, agents, and IPython", function()

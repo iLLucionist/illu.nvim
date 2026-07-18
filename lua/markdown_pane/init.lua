@@ -1,4 +1,5 @@
 local defaults = require("markdown_pane.defaults")
+local context = require("markdown_pane.context")
 local document_picker = require("markdown_pane.document_picker")
 local entries = require("markdown_pane.entries")
 local heading = require("markdown_pane.heading")
@@ -7,7 +8,6 @@ local maps = require("markdown_pane.maps")
 local picker = require("markdown_pane.picker")
 local question = require("markdown_pane.question")
 local render = require("markdown_pane.render")
-local selection = require("markdown_pane.selection")
 local switcher = require("markdown_pane.switcher")
 local terminal = require("markdown_pane.terminal")
 local util = require("markdown_pane.util")
@@ -38,9 +38,6 @@ local focus_group = vim.api.nvim_create_augroup("MarkdownPaneFocus", { clear = t
 local shutdown_group = vim.api.nvim_create_augroup("MarkdownPaneShutdown", { clear = true })
 
 local valid_win = util.valid_win
-local valid_buf = util.valid_buf
-local project_root = util.project_root
-local project_root_for_path = util.project_root_for_path
 local statusline_escape = heading.statusline_escape
 
 --- Show a numbered/lettered picker and pass the selected entry to a callback.
@@ -50,21 +47,7 @@ end
 
 --- Return whether a buffer belongs to the pane or one of its terminals.
 local function is_pane_buf(bufnr)
-    if not valid_buf(bufnr) then
-        return false
-    end
-
-    if bufnr == M.bufnr then
-        return true
-    end
-
-    for _, ctx in pairs(M.terminals or {}) do
-        if bufnr == ctx.bufnr then
-            return true
-        end
-    end
-
-    return false
+    return context.is_pane_buf(M, bufnr)
 end
 
 --- Remember the most recent normal window outside the pane.
@@ -76,7 +59,7 @@ end
 
 --- Find the pane terminal context for a buffer.
 local function terminal_context_for_buf(bufnr)
-    return terminal.context_for_buf(M, bufnr)
+    return context.terminal_context_for_buf(M, bufnr)
 end
 
 --- Return whether a terminal context still has a live job and buffer.
@@ -168,17 +151,7 @@ end
 
 --- Resolve the project root associated with a pane buffer.
 local function pane_root(bufnr)
-    local terminal_ctx = terminal_context_for_buf(bufnr)
-
-    if terminal_ctx then
-        return terminal_ctx.root
-    end
-
-    if bufnr == M.bufnr and M.source then
-        return project_root_for_path(M.source)
-    end
-
-    return project_root(bufnr)
+    return context.pane_root(M, bufnr)
 end
 
 --- Install pane-local mappings on a markdown or terminal pane buffer.
@@ -316,11 +289,7 @@ end
 
 --- Capture text, file, root, and snippet language for a send/ask action.
 local function selection_context(opts)
-    return selection.context(opts, {
-        pane_bufnr = M.bufnr,
-        source = M.source,
-        terminal_context_for_buf = terminal_context_for_buf,
-    })
+    return context.selection_context(M, opts)
 end
 
 --- Build terminal module callbacks that still belong to pane/window state.
