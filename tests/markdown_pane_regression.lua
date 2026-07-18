@@ -84,6 +84,10 @@ local function reset_pane()
     pane.shutdown_terminals({ timeout_ms = 50 })
     pane.close()
     pane.zoomed = false
+    pane.source = nil
+    pane.markdown_view = nil
+    pane.active_mode = "markdown"
+    pane.active_terminal_key = nil
     pane.config = vim.deepcopy(defaults.config)
 end
 
@@ -504,6 +508,129 @@ test("smart gf from markdown pane opens in last non-pane window", function()
     assert(vim.api.nvim_get_current_win() == origin_win, "gf did not return to origin window")
     assert(vim.api.nvim_buf_get_name(0) == root .. "/src/ir.py", "gf opened wrong buffer")
     assert(vim.api.nvim_win_get_buf(pane.winid) == pane.bufnr, "pane buffer was replaced")
+end)
+
+test("open without path uses current markdown buffer", function()
+    reset_pane()
+
+    local root = root_fixture("viewer-default-current-test")
+    local doc = root .. "/docs/current.md"
+
+    write(doc, { "# Current", "", "body" })
+    vim.cmd.edit(doc)
+    vim.api.nvim_set_option_value("filetype", "markdown", { buf = 0 })
+
+    local origin_win = vim.api.nvim_get_current_win()
+
+    pane.open()
+
+    assert(pane.source == doc, "pane did not use current markdown file")
+    assert(vim.api.nvim_get_current_win() == origin_win, "open stole focus")
+    assert(vim.api.nvim_buf_get_lines(pane.bufnr, 0, 1, false)[1] == "# Current", "pane loaded wrong markdown")
+end)
+
+test("unreadable markdown path does not mutate viewer state", function()
+    reset_pane()
+
+    local root = root_fixture("viewer-unreadable-test")
+    local doc = root .. "/docs/doc.md"
+
+    write(doc, { "# Original", "", "keep me" })
+    pane.setup({ auto_reflow = false })
+    pane.open(doc)
+
+    local source = pane.source
+    local lines = vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false)
+
+    pane.open(root .. "/docs/missing.md")
+
+    assert(pane.source == source, "missing file changed pane source")
+    assert(vim.deep_equal(vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false), lines), "missing file changed pane buffer")
+end)
+
+test("opening a different markdown file resets cursor to top", function()
+    reset_pane()
+
+    local root = root_fixture("viewer-different-file-test")
+    local first = root .. "/docs/first.md"
+    local second = root .. "/docs/second.md"
+    local first_lines = {}
+    local second_lines = {}
+
+    for index = 1, 40 do
+        table.insert(first_lines, "First " .. index)
+        table.insert(second_lines, "Second " .. index)
+    end
+
+    write(first, first_lines)
+    write(second, second_lines)
+    pane.setup({ auto_reflow = false })
+    pane.open(first)
+    pane.focus_toggle()
+    vim.api.nvim_win_set_cursor(pane.winid, { 30, 0 })
+    pane.open(second)
+
+    assert(pane.source == second, "second file did not become source")
+    assert(vim.api.nvim_win_get_cursor(pane.winid)[1] == 1, "different file did not reset cursor")
+    assert(vim.api.nvim_buf_get_lines(pane.bufnr, 0, 1, false)[1] == "Second 1", "second file did not load")
+end)
+
+test("show markdown from terminal restores markdown cursor view", function()
+    reset_pane()
+
+    local root = root_fixture("viewer-show-markdown-test")
+    local doc = root .. "/docs/doc.md"
+    local lines = {}
+
+    for index = 1, 70 do
+        table.insert(lines, "Line " .. index)
+    end
+
+    write(doc, lines)
+    pane.setup({
+        auto_reflow = false,
+        focus_on_switch = true,
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    pane.open(doc)
+    pane.focus_toggle()
+    vim.api.nvim_win_set_cursor(pane.winid, { 45, 0 })
+    vim.api.nvim_win_call(pane.winid, function()
+        vim.cmd("normal! zt")
+    end)
+
+    pane.open_terminal("codex", nil, { root = root, focus = true })
+    pane.show_markdown()
+
+    assert(pane.active_mode == "markdown", "show_markdown did not activate markdown")
+    assert(vim.api.nvim_win_get_buf(pane.winid) == pane.bufnr, "show_markdown did not restore markdown buffer")
+    assert(vim.api.nvim_win_get_cursor(pane.winid)[1] == 45, "show_markdown did not restore cursor")
+end)
+
+test("toggle closes pane and reopens last markdown source", function()
+    reset_pane()
+
+    local root = root_fixture("viewer-toggle-test")
+    local doc = root .. "/docs/doc.md"
+
+    write(doc, { "# Toggle", "", "body" })
+    pane.open(doc)
+
+    local source = pane.source
+
+    assert(pane.is_open(), "pane was not opened")
+    pane.toggle()
+    assert(not pane.is_open(), "toggle did not close open pane")
+    pane.toggle()
+    assert(pane.is_open(), "toggle did not reopen pane")
+    assert(pane.source == source, "toggle did not reopen last source")
 end)
 
 test("focus toggle moves between normal window and pane", function()

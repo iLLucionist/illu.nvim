@@ -8,6 +8,7 @@ local selection = require("markdown_pane.selection")
 local terminal = require("markdown_pane.terminal")
 local util = require("markdown_pane.util")
 local pane_window = require("markdown_pane.window")
+local viewer = require("markdown_pane.viewer")
 
 local M = {
     winid = nil,
@@ -33,7 +34,6 @@ local shutdown_group = vim.api.nvim_create_augroup("MarkdownPaneShutdown", { cle
 
 local valid_win = util.valid_win
 local valid_buf = util.valid_buf
-local resolve_path = util.resolve_path
 local project_root = util.project_root
 local project_root_for_path = util.project_root_for_path
 local root_label = util.root_label
@@ -107,25 +107,6 @@ local function last_coding_agent_context(root)
     return terminal.last_coding_agent_context(M, root)
 end
 
---- Resolve the default markdown file for the current working tree.
-local function default_path()
-    if vim.bo.filetype == "markdown" then
-        local current = vim.api.nvim_buf_get_name(0)
-
-        if current ~= "" then
-            return current
-        end
-    end
-
-    local readme = vim.fn.getcwd() .. "/README.md"
-
-    if vim.fn.filereadable(readme) == 1 then
-        return readme
-    end
-
-    return nil
-end
-
 --- Return the user-selected wrap state or configured wrap default.
 local function preferred_wrap()
     return pane_window.preferred_wrap(M)
@@ -138,37 +119,12 @@ end
 
 --- Save the markdown pane cursor and scroll view for later restoration.
 local function save_markdown_view()
-    if not valid_win(M.winid) or not valid_buf(M.bufnr) then
-        return
-    end
-
-    if vim.api.nvim_win_get_buf(M.winid) ~= M.bufnr then
-        return
-    end
-
-    local ok, view = pcall(vim.api.nvim_win_call, M.winid, vim.fn.winsaveview)
-
-    if ok then
-        M.markdown_view = {
-            source = M.source,
-            view = view,
-        }
-    end
+    viewer.save_view(M)
 end
 
 --- Restore the saved markdown cursor and scroll view when possible.
 local function restore_markdown_view()
-    if not valid_win(M.winid) or not M.markdown_view then
-        return
-    end
-
-    if M.markdown_view.source ~= M.source then
-        return
-    end
-
-    pcall(vim.api.nvim_win_call, M.winid, function()
-        vim.fn.winrestview(M.markdown_view.view)
-    end)
+    viewer.restore_view(M)
 end
 
 --- Build the winbar title for the active terminal pane.
@@ -241,23 +197,13 @@ end
 
 --- Create or return the markdown viewer buffer.
 local function ensure_buf()
-    if valid_buf(M.bufnr) then
-        return M.bufnr
-    end
-
-    M.bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(M.bufnr, "Markdown Pane")
-    vim.api.nvim_set_option_value("buftype", "", { buf = M.bufnr })
-    vim.api.nvim_set_option_value("bufhidden", "hide", { buf = M.bufnr })
-    vim.api.nvim_set_option_value("swapfile", false, { buf = M.bufnr })
-    vim.api.nvim_set_option_value("filetype", "markdown", { buf = M.bufnr })
-
-    return M.bufnr
+    return viewer.ensure_buf(M)
 end
 
 local render_markview
 local setup_pane_maps
 local window_deps
+local viewer_deps
 
 --- Apply pane-local window options for markdown or terminal mode.
 local function set_window_options(winid, mode)
@@ -367,125 +313,35 @@ local function ensure_win(bufnr, mode, opts)
     return pane_window.ensure(M, window_deps(), bufnr, mode, opts)
 end
 
---- Load markdown file contents into the pane buffer.
-local function load_file(path)
-    local bufnr = ensure_buf()
-    local ok, lines = pcall(vim.fn.readfile, path)
-
-    if not ok then
-        vim.notify("Could not read markdown file: " .. path, vim.log.levels.ERROR)
-        return false
-    end
-
-    M.source = path
-
-    render_markview(bufnr)
-    vim.api.nvim_set_option_value("readonly", false, { buf = bufnr })
-    vim.api.nvim_set_option_value("modifiable", true, { buf = bufnr })
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-    vim.api.nvim_set_option_value("filetype", "markdown", { buf = bufnr })
-    pcall(vim.treesitter.start, bufnr, "markdown")
-
-    reflow_pane_buffer(bufnr)
-
-    vim.api.nvim_set_option_value("modified", false, { buf = bufnr })
-    vim.api.nvim_set_option_value("readonly", true, { buf = bufnr })
-    vim.api.nvim_set_option_value("modifiable", false, { buf = bufnr })
-    render_markview(bufnr)
-    update_sticky_heading()
-
-    return true
-end
-
 --- Toggle wrapping in the markdown viewer pane.
 function M.toggle_wrap()
     M.wrap_enabled = not preferred_wrap()
     apply_wrap_state()
 end
 
+--- Build viewer module callbacks that still belong to pane/window/render state.
+viewer_deps = function()
+    return {
+        close_pane = M.close,
+        ensure_win = ensure_win,
+        pick = M.pick,
+        reflow_pane_buffer = reflow_pane_buffer,
+        remember_terminal_context = remember_terminal_context,
+        render_markview = render_markview,
+        set_window_options = set_window_options,
+        setup_pane_maps = setup_pane_maps,
+        update_sticky_heading = update_sticky_heading,
+    }
+end
+
 --- Open a markdown file in the pane without stealing focus.
 function M.open(path)
-    path = resolve_path(path) or default_path()
-
-    if not path then
-        M.pick()
-        return
-    end
-
-    if vim.fn.filereadable(path) ~= 1 then
-        vim.notify("Markdown file not readable: " .. path, vim.log.levels.ERROR)
-        return
-    end
-
-    local previous = vim.api.nvim_get_current_win()
-    local should_restore_view = M.source == path and M.markdown_view and M.markdown_view.source == path
-
-    M.active_mode = "markdown"
-    M.active_terminal_key = nil
-
-    local winid = ensure_win(ensure_buf(), "markdown")
-
-    if not load_file(path) then
-        return
-    end
-
-    set_window_options(winid, "markdown")
-    update_sticky_heading()
-    render_markview(M.bufnr)
-
-    vim.api.nvim_win_call(winid, function()
-        if should_restore_view then
-            restore_markdown_view()
-        else
-            vim.api.nvim_win_set_cursor(0, { 1, 0 })
-            vim.cmd("normal! zt")
-        end
-    end)
-    setup_pane_maps(M.bufnr)
-
-    if valid_win(previous) then
-        vim.api.nvim_set_current_win(previous)
-    end
+    viewer.open(M, viewer_deps(), path)
 end
 
 --- Switch the pane back to the markdown viewer.
 function M.show_markdown()
-    if not valid_buf(M.bufnr) then
-        M.open(M.source)
-
-        if M.config.focus_on_switch and valid_win(M.winid) then
-            local previous = vim.api.nvim_get_current_win()
-
-            if previous ~= M.winid and valid_win(previous) then
-                M.last_focus_win = previous
-            end
-
-            vim.api.nvim_set_current_win(M.winid)
-        end
-
-        return
-    end
-
-    local previous = vim.api.nvim_get_current_win()
-
-    if M.active_terminal_key then
-        remember_terminal_context(M.terminals[M.active_terminal_key])
-    end
-
-    M.active_mode = "markdown"
-    M.active_terminal_key = nil
-
-    local winid = ensure_win(M.bufnr, "markdown", { focus = M.config.focus_on_switch })
-
-    set_window_options(winid, "markdown")
-    update_sticky_heading()
-    render_markview(M.bufnr)
-    restore_markdown_view()
-    setup_pane_maps(M.bufnr)
-
-    if not M.config.focus_on_switch and valid_win(previous) then
-        vim.api.nvim_set_current_win(previous)
-    end
+    viewer.show_markdown(M, viewer_deps())
 end
 
 --- Close the pane window while preserving buffers and state.
@@ -495,13 +351,7 @@ end
 
 --- Toggle the pane, optionally opening a specific markdown file.
 function M.toggle(path)
-    if path and path ~= "" then
-        M.open(path)
-    elseif valid_win(M.winid) then
-        M.close()
-    else
-        M.open(M.source)
-    end
+    viewer.toggle(M, viewer_deps(), path)
 end
 
 --- Return whether the pane window is currently open.
@@ -757,7 +607,7 @@ function M.pick()
             "*.markdown",
         }, {
             entry_maker = function(entry)
-                local path = resolve_path(entry)
+                local path = util.resolve_path(entry)
 
                 return {
                     value = path,
@@ -775,7 +625,7 @@ function M.pick()
             results = files,
             entry_maker = function(entry)
                 return {
-                    value = resolve_path(entry),
+                    value = util.resolve_path(entry),
                     display = vim.fn.fnamemodify(entry, ":."),
                     ordinal = entry,
                 }
