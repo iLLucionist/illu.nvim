@@ -1,11 +1,11 @@
 vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
-local defaults = require("markdown_pane.defaults")
-local pane_context = require("markdown_pane.context")
-local document_picker = require("markdown_pane.document_picker")
-local entries = require("markdown_pane.entries")
+local defaults = require("sidepanes.defaults")
+local pane_context = require("sidepanes.context")
+local document_picker = require("sidepanes.document_picker")
+local entries = require("sidepanes.entries")
 local markdown_reflow = require("markdown_reflow")
-local pane = require("markdown_pane")
+local pane = require("sidepanes")
 
 local tests = {}
 
@@ -123,7 +123,7 @@ test("pane-local slot maps exist on markdown and terminal panes", function()
     pane.open(root .. "/docs/doc.md")
 
     for _, lhs in ipairs({ " 0", " x", " c", " i" }) do
-        assert(has_map(pane.bufnr, lhs), lhs .. " missing on markdown pane")
+        assert(has_map(pane.bufnr, lhs), lhs .. " missing on sidepanes")
     end
 
     local ctx = pane.open_terminal("ipython", nil, { root = root, focus = true })
@@ -169,8 +169,8 @@ test("setup installs single focus and shutdown autocmds when repeated", function
         wrap = true,
     })
 
-    local focus_autocmds = vim.api.nvim_get_autocmds({ group = "MarkdownPaneFocus" })
-    local shutdown_autocmds = vim.api.nvim_get_autocmds({ group = "MarkdownPaneShutdown" })
+    local focus_autocmds = vim.api.nvim_get_autocmds({ group = "SidepanesFocus" })
+    local shutdown_autocmds = vim.api.nvim_get_autocmds({ group = "SidepanesShutdown" })
 
     assert(#focus_autocmds == 1, "setup duplicated focus autocmds")
     assert(#shutdown_autocmds == 1, "setup duplicated shutdown autocmds")
@@ -204,10 +204,10 @@ test("context identifies pane buffers and resolves pane roots", function()
 
     local ctx = pane.open_terminal("codex", nil, { root = root, focus = false })
 
-    assert(pane_context.is_pane_buf(pane, pane.bufnr), "markdown pane buffer was not identified")
+    assert(pane_context.is_pane_buf(pane, pane.bufnr), "sidepanes buffer was not identified")
     assert(pane_context.is_pane_buf(pane, ctx.bufnr), "terminal pane buffer was not identified")
     assert(not pane_context.is_pane_buf(pane, normal_buf), "normal buffer was identified as pane buffer")
-    assert(pane_context.pane_root(pane, pane.bufnr) == root, "markdown pane root did not use source")
+    assert(pane_context.pane_root(pane, pane.bufnr) == root, "sidepanes root did not use source")
     assert(pane_context.pane_root(pane, ctx.bufnr) == root, "terminal pane root did not use terminal context")
     assert(pane_context.pane_root(pane, normal_buf) == vim.fn.fnamemodify(other, ":p"), "normal buffer root was wrong")
 end)
@@ -706,7 +706,7 @@ test("asking with a new preset reuses the same agent session and sends a model s
     assert(current[1].preset_name == "two", "model picker current preset did not follow switch")
 end)
 
-test("smart gf from markdown pane opens in last non-pane window", function()
+test("smart gf from sidepanes opens in last non-pane window", function()
     reset_pane()
 
     local root = root_fixture("smart-gf-markdown-test")
@@ -877,7 +877,7 @@ test("focus toggle moves between normal window and pane", function()
     assert(vim.api.nvim_get_current_win() == origin_win, "focus_toggle did not return to origin window")
 end)
 
-test("closing and reopening markdown pane restores cursor view", function()
+test("closing and reopening sidepanes restores cursor view", function()
     reset_pane()
 
     local root = root_fixture("close-reopen-view-test")
@@ -960,9 +960,9 @@ test("markdown and terminal pane window options are mode-specific", function()
 
     pane.open(root .. "/docs/doc.md")
 
-    assert(vim.api.nvim_get_option_value("number", { win = pane.winid }) == true, "markdown pane number option was off")
-    assert(vim.api.nvim_get_option_value("wrap", { win = pane.winid }) == true, "markdown pane wrap option was off")
-    assert(vim.api.nvim_get_option_value("conceallevel", { win = pane.winid }) == 3, "markdown pane conceallevel was wrong")
+    assert(vim.api.nvim_get_option_value("number", { win = pane.winid }) == true, "sidepanes number option was off")
+    assert(vim.api.nvim_get_option_value("wrap", { win = pane.winid }) == true, "sidepanes wrap option was off")
+    assert(vim.api.nvim_get_option_value("conceallevel", { win = pane.winid }) == 3, "sidepanes conceallevel was wrong")
 
     pane.open_terminal("codex", nil, { root = root, focus = true })
 
@@ -1361,4 +1361,4 @@ if #failures > 0 then
     error(table.concat(failures, "\n\n"))
 end
 
-print("markdown_pane regression tests passed: " .. #tests)
+print("sidepanes regression tests passed: " .. #tests)

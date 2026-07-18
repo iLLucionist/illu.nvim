@@ -1,11 +1,11 @@
 --[[
-markdown_pane.document_picker
+sidepanes.document_picker
 Purpose: Provide the Telescope-based markdown document picker.
 Does: Discovers markdown files with rg or glob fallback, builds picker entries, and opens the selected path through a callback.
 Architecture: Keeps document discovery and Telescope wiring outside the public facade while delegating pane opening back to init.lua.
 ]]
 
-local util = require("markdown_pane.util")
+local util = require("sidepanes.util")
 
 local M = {}
 
@@ -62,7 +62,7 @@ function M.pick(on_select)
     local finder = M.finder(finders)
 
     pickers.new({}, {
-        prompt_title = "Markdown Pane",
+        prompt_title = "Sidepanes",
         finder = finder,
         sorter = conf.file_sorter({}),
         attach_mappings = function(prompt_bufnr)

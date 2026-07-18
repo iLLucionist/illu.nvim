@@ -1,5 +1,5 @@
 --[[
-markdown_pane.maps
+sidepanes.maps
 Purpose: Install pane-local keymaps for markdown and terminal pane buffers.
 Does: Binds quick pane switching, smart gf, ask mappings, and markdown wrap toggling with buffer-local scope.
 Architecture: Receives behavior through dependency callbacks from init.lua so mappings stay declarative and do not own plugin state.
@@ -34,7 +34,7 @@ function M.setup(bufnr, deps)
 
     map(bufnr, "n", "<space>0", function()
         deps.show_markdown()
-    end, "Show markdown pane", { nowait = true })
+    end, "Show sidepanes", { nowait = true })
 
     map(bufnr, "n", "<space>x", function()
         deps.open_terminal("codex", nil, { root = deps.pane_root(bufnr), focus = true })
@@ -79,7 +79,7 @@ function M.setup(bufnr, deps)
     if bufnr == deps.markdown_bufnr() then
         map(bufnr, "n", deps.wrap_toggle_key(), function()
             deps.toggle_wrap()
-        end, "Toggle markdown pane wrap")
+        end, "Toggle sidepanes wrap")
     end
 end
 

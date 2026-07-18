@@ -1,11 +1,11 @@
 --[[
-markdown_pane.render
+sidepanes.render
 Purpose: Handle markdown rendering refreshes and automatic reflow.
 Does: Re-runs markview rendering, invokes internal or external markdown reflow, and updates wrap state.
 Architecture: Encapsulates buffer formatting/render side effects behind dependency callbacks for pane width and window options.
 ]]
 
-local util = require("markdown_pane.util")
+local util = require("sidepanes.util")
 
 local M = {}
 
@@ -21,7 +21,7 @@ function M.markview(bufnr)
     pcall(markview.render, bufnr, { enable = true, hybrid_mode = false })
 end
 
---- Reflow the markdown pane buffer using configured internal or external formatting.
+--- Reflow the sidepanes buffer using configured internal or external formatting.
 function M.reflow_buffer(state, deps, bufnr, opts)
     opts = opts or {}
     bufnr = bufnr or state.bufnr

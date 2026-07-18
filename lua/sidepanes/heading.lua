@@ -1,11 +1,11 @@
 --[[
-markdown_pane.heading
+sidepanes.heading
 Purpose: Parse and format markdown heading text for pane display.
 Does: Escapes statusline text, truncates display labels, and finds the nearest active ATX or Setext heading above the viewport.
 Architecture: Supports winbar.lua with pure heading/statusline helpers that do not own pane state.
 ]]
 
-local util = require("markdown_pane.util")
+local util = require("sidepanes.util")
 
 local M = {}
 

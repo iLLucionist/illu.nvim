@@ -1,8 +1,8 @@
 vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
-local defaults = require("markdown_pane.defaults")
-local pane = require("markdown_pane")
-local util = require("markdown_pane.util")
+local defaults = require("sidepanes.defaults")
+local pane = require("sidepanes")
+local util = require("sidepanes.util")
 
 local root = "/private/tmp/illu-real-cli-smoke"
 
@@ -75,4 +75,4 @@ if #failures > 0 then
     error(table.concat(failures, "\n\n"))
 end
 
-print("markdown_pane real CLI smoke passed")
+print("sidepanes real CLI smoke passed")

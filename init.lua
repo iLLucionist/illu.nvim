@@ -336,7 +336,7 @@ require("lualine").setup()
 
 -- Bufferline
 require("barbar").setup({
-    exclude_name = { "Markdown Pane" },
+    exclude_name = { "Sidepanes" },
     icons = {
         buffer_index = true,
     },
@@ -371,12 +371,12 @@ local function markdown_headings()
     local conf = require("telescope.config").values
     local actions = require("telescope.actions")
     local action_state = require("telescope.actions.state")
-    local markdown_pane = require("markdown_pane")
+    local sidepanes = require("sidepanes")
     local headings = {}
     local origin_win = vim.api.nvim_get_current_win()
-    local pane_visible = markdown_pane.is_open()
-    local bufnr = pane_visible and markdown_pane.bufnr or vim.api.nvim_get_current_buf()
-    local target_win = pane_visible and markdown_pane.winid or origin_win
+    local pane_visible = sidepanes.is_open()
+    local bufnr = pane_visible and sidepanes.bufnr or vim.api.nvim_get_current_buf()
+    local target_win = pane_visible and sidepanes.winid or origin_win
     local ok, parser = pcall(vim.treesitter.get_parser, bufnr, "markdown")
 
     if not ok or not parser then
@@ -548,77 +548,77 @@ end
 
 map('n', '<leader>fm', markdown_headings, {})
 
-local markdown_pane = require("markdown_pane")
+local sidepanes = require("sidepanes")
 local markdown_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" }
 
-markdown_pane.setup({
+sidepanes.setup({
     external_reflow_cmd = markdown_reflow_cmd,
     external_reflow_protect_tables = true,
 })
 
-vim.api.nvim_create_user_command("MarkdownPaneToggle", function(opts)
-    markdown_pane.toggle(opts.args)
+vim.api.nvim_create_user_command("SidepanesToggle", function(opts)
+    sidepanes.toggle(opts.args)
 end, { nargs = "?", complete = "file" })
 
-vim.api.nvim_create_user_command("MarkdownPanePick", function()
-    markdown_pane.pick()
+vim.api.nvim_create_user_command("SidepanesPick", function()
+    sidepanes.pick()
 end, {})
 
 vim.api.nvim_create_user_command("PaneSwitch", function()
-    markdown_pane.switch_picker()
+    sidepanes.switch_picker()
 end, {})
 
 vim.api.nvim_create_user_command("PaneTool", function(opts)
     local parts = vim.split(opts.args or "", "%s+", { trimempty = true })
 
     if not parts[1] then
-        markdown_pane.switch_picker()
+        sidepanes.switch_picker()
         return
     end
 
-    markdown_pane.open_terminal(parts[1], parts[2])
+    sidepanes.open_terminal(parts[1], parts[2])
 end, { nargs = "*" })
 
 vim.api.nvim_create_user_command("PaneCodex", function(opts)
     local preset = opts.args ~= "" and opts.args or nil
-    markdown_pane.open_terminal("codex", preset)
+    sidepanes.open_terminal("codex", preset)
 end, { nargs = "?" })
 
 vim.api.nvim_create_user_command("PaneClaude", function(opts)
     local preset = opts.args ~= "" and opts.args or nil
-    markdown_pane.open_terminal("claude", preset)
+    sidepanes.open_terminal("claude", preset)
 end, { nargs = "?" })
 
 vim.api.nvim_create_user_command("PaneIPython", function()
-    markdown_pane.open_ipython({
+    sidepanes.open_ipython({
         bufnr = vim.api.nvim_get_current_buf(),
         focus = true,
     })
 end, {})
 
 vim.api.nvim_create_user_command("PaneIPythonRestart", function()
-    markdown_pane.restart_ipython({
+    sidepanes.restart_ipython({
         bufnr = vim.api.nvim_get_current_buf(),
         focus = true,
     })
 end, {})
 
 vim.api.nvim_create_user_command("PaneIPythonClear", function()
-    markdown_pane.clear_ipython({
+    sidepanes.clear_ipython({
         bufnr = vim.api.nvim_get_current_buf(),
     })
 end, {})
 
 vim.api.nvim_create_user_command("PaneFocus", function()
-    markdown_pane.focus_toggle()
+    sidepanes.focus_toggle()
 end, {})
 
 vim.api.nvim_create_user_command("PaneZoom", function()
-    markdown_pane.toggle_zoom()
+    sidepanes.toggle_zoom()
 end, {})
 
 vim.api.nvim_create_user_command("PaneAsk", function(opts)
-    markdown_pane.ask_picker({
+    sidepanes.ask_picker({
         bufnr = vim.api.nvim_get_current_buf(),
         line1 = opts.line1,
         line2 = opts.line2,
@@ -628,7 +628,7 @@ end, { range = true })
 vim.api.nvim_create_user_command("PaneAskCodex", function(opts)
     local preset = opts.args ~= "" and opts.args or nil
 
-    markdown_pane.ask("codex", preset, {
+    sidepanes.ask("codex", preset, {
         bufnr = vim.api.nvim_get_current_buf(),
         line1 = opts.line1,
         line2 = opts.line2,
@@ -638,7 +638,7 @@ end, { nargs = "?", range = true })
 vim.api.nvim_create_user_command("PaneAskClaude", function(opts)
     local preset = opts.args ~= "" and opts.args or nil
 
-    markdown_pane.ask("claude", preset, {
+    sidepanes.ask("claude", preset, {
         bufnr = vim.api.nvim_get_current_buf(),
         line1 = opts.line1,
         line2 = opts.line2,
@@ -646,89 +646,89 @@ vim.api.nvim_create_user_command("PaneAskClaude", function(opts)
 end, { nargs = "?", range = true })
 
 map('n', '<leader>pp', function()
-    markdown_pane.toggle()
+    sidepanes.toggle()
 end, {})
 map('n', '<leader>mP', function()
-    markdown_pane.pick()
+    sidepanes.pick()
 end, {})
 map('n', '<leader>p0', function()
-    markdown_pane.show_markdown()
+    sidepanes.show_markdown()
 end, {})
 map('n', '<leader>px', function()
-    markdown_pane.open_terminal("codex", nil, {
+    sidepanes.open_terminal("codex", nil, {
         bufnr = vim.api.nvim_get_current_buf(),
         focus = true,
     })
 end, {})
 map('n', '<leader>pc', function()
-    markdown_pane.open_terminal("claude", nil, {
+    sidepanes.open_terminal("claude", nil, {
         bufnr = vim.api.nvim_get_current_buf(),
         focus = true,
     })
 end, {})
 map('n', '<leader>pi', function()
-    markdown_pane.open_ipython({
+    sidepanes.open_ipython({
         bufnr = vim.api.nvim_get_current_buf(),
         focus = true,
     })
 end, {})
 map('n', '<leader>pR', function()
-    markdown_pane.restart_ipython({
+    sidepanes.restart_ipython({
         bufnr = vim.api.nvim_get_current_buf(),
         focus = true,
     })
 end, {})
 map('n', '<leader>pl', function()
-    markdown_pane.send_ipython({
+    sidepanes.send_ipython({
         bufnr = vim.api.nvim_get_current_buf(),
         line1 = vim.fn.line("."),
         line2 = vim.fn.line("."),
     })
 end, {})
 map('x', '<leader>pl', function()
-    markdown_pane.send_ipython({
+    sidepanes.send_ipython({
         bufnr = vim.api.nvim_get_current_buf(),
         visual = true,
         visual_mode = vim.fn.mode(1),
     })
 end, {})
 map('n', '<leader>pX', function()
-    markdown_pane.clear_ipython({
+    sidepanes.clear_ipython({
         bufnr = vim.api.nvim_get_current_buf(),
     })
 end, {})
 map('n', '<leader>pf', function()
-    markdown_pane.focus_toggle()
+    sidepanes.focus_toggle()
 end, {})
 map('n', '<leader>pz', function()
-    markdown_pane.toggle_zoom()
+    sidepanes.toggle_zoom()
 end, {})
 map('n', '<leader>ps', function()
-    markdown_pane.switch_picker()
+    sidepanes.switch_picker()
 end, {})
 map('x', '<leader>pa', function()
-    markdown_pane.ask_picker({
+    sidepanes.ask_picker({
         bufnr = vim.api.nvim_get_current_buf(),
         visual = true,
         visual_mode = vim.fn.mode(1),
     })
 end, {})
 map('x', 'aa', function()
-    markdown_pane.ask_last_coding_agent({
+    sidepanes.ask_last_coding_agent({
         bufnr = vim.api.nvim_get_current_buf(),
         visual = true,
         visual_mode = vim.fn.mode(1),
     })
 end, { desc = "Ask last coding agent" })
 map('x', 'ax', function()
-    markdown_pane.ask_current_coding_agent("codex", {
+    sidepanes.ask_current_coding_agent("codex", {
         bufnr = vim.api.nvim_get_current_buf(),
         visual = true,
         visual_mode = vim.fn.mode(1),
     })
 end, { desc = "Ask current Codex pane" })
 map('x', 'ac', function()
-    markdown_pane.ask_current_coding_agent("claude", {
+    sidepanes.ask_current_coding_agent("claude", {
         bufnr = vim.api.nvim_get_current_buf(),
         visual = true,
         visual_mode = vim.fn.mode(1),
@@ -1091,9 +1091,9 @@ require("nvim-surround").setup()
 -- Tree sidebar files
 
 local function nvim_tree_file_target_picker()
-    local ok, markdown_pane = pcall(require, "markdown_pane")
-    local pane_winid = ok and markdown_pane.winid or nil
-    local pane_bufnr = ok and markdown_pane.bufnr or nil
+    local ok, sidepanes = pcall(require, "sidepanes")
+    local pane_winid = ok and sidepanes.winid or nil
+    local pane_bufnr = ok and sidepanes.bufnr or nil
     local alternate_winid = vim.fn.win_getid(vim.fn.winnr("#"))
     local candidates = {}
 

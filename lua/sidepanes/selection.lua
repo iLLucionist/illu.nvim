@@ -1,11 +1,11 @@
 --[[
-markdown_pane.selection
+sidepanes.selection
 Purpose: Capture and format source text for sends and questions.
 Does: Reads visual selections or line ranges, detects markdown fenced-code languages, resolves file/root metadata, and builds prompt templates.
 Architecture: Pure context builder used by context.lua, question.lua, and terminal.lua before content is sent to agents or IPython.
 ]]
 
-local util = require("markdown_pane.util")
+local util = require("sidepanes.util")
 
 local M = {}
 

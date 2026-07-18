@@ -1,11 +1,11 @@
 --[[
-markdown_pane.viewer
+sidepanes.viewer
 Purpose: Manage the markdown viewer buffer and its document lifecycle.
 Does: Chooses default markdown files, creates and loads the viewer buffer, preserves scroll/cursor view, and switches the pane back to markdown.
 Architecture: Owns markdown-buffer behavior while delegating window placement, rendering, mappings, and terminal memory through dependencies.
 ]]
 
-local util = require("markdown_pane.util")
+local util = require("sidepanes.util")
 
 local M = {}
 
@@ -35,7 +35,7 @@ function M.ensure_buf(state)
     end
 
     state.bufnr = vim.api.nvim_create_buf(false, true)
-    vim.api.nvim_buf_set_name(state.bufnr, "Markdown Pane")
+    vim.api.nvim_buf_set_name(state.bufnr, "Sidepanes")
     vim.api.nvim_set_option_value("buftype", "", { buf = state.bufnr })
     vim.api.nvim_set_option_value("bufhidden", "hide", { buf = state.bufnr })
     vim.api.nvim_set_option_value("swapfile", false, { buf = state.bufnr })
@@ -44,7 +44,7 @@ function M.ensure_buf(state)
     return state.bufnr
 end
 
---- Save the markdown pane cursor and scroll view for later restoration.
+--- Save the sidepanes cursor and scroll view for later restoration.
 function M.save_view(state)
     if not util.valid_win(state.winid) or not util.valid_buf(state.bufnr) then
         return

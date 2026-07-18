@@ -25,10 +25,10 @@ local function target_width(opts)
         return opts.width
     end
 
-    local ok, markdown_pane = pcall(require, "markdown_pane")
+    local ok, sidepanes = pcall(require, "sidepanes")
 
-    if ok and markdown_pane.is_open and markdown_pane.is_open() and markdown_pane.text_width then
-        local pane_width = markdown_pane.text_width()
+    if ok and sidepanes.is_open and sidepanes.is_open() and sidepanes.text_width then
+        local pane_width = sidepanes.text_width()
 
         if pane_width and pane_width > 0 then
             return pane_width

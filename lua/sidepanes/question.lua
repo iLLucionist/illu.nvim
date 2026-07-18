@@ -1,12 +1,12 @@
 --[[
-markdown_pane.question
+sidepanes.question
 Purpose: Manage the editable ask prompt workflow for coding-agent terminals.
 Does: Captures selection context, opens the scratch prompt editor, tracks write-then-quit semantics, switches targets, and sends prompts.
 Architecture: Orchestrates selection, picker, and terminal callbacks while keeping prompt-buffer state in the shared plugin state table.
 ]]
 
-local util = require("markdown_pane.util")
-local selection = require("markdown_pane.selection")
+local util = require("sidepanes.util")
+local selection = require("sidepanes.selection")
 
 local M = {}
 
@@ -88,7 +88,7 @@ local function open_buffer(state, deps, entry, context, origin)
     origin = origin or capture_origin(state)
 
     local scratch = vim.api.nvim_create_buf(false, true)
-    local augroup = vim.api.nvim_create_augroup("MarkdownPaneQuestion" .. scratch, { clear = true })
+    local augroup = vim.api.nvim_create_augroup("SidepanesQuestion" .. scratch, { clear = true })
     local scratch_win = nil
     local sent = false
     local buffer_state = {
@@ -255,7 +255,7 @@ local function open_buffer(state, deps, entry, context, origin)
 
         if line == "q" or line == "q!" or line == "quit" or line == "quit!" then
             return vim.api.nvim_replace_termcodes(
-                '<C-u>lua require("markdown_pane").finish_question(' .. scratch .. ')<CR>',
+                '<C-u>lua require("sidepanes").finish_question(' .. scratch .. ')<CR>',
                 true,
                 false,
                 true
@@ -264,7 +264,7 @@ local function open_buffer(state, deps, entry, context, origin)
 
         if line == "wq" or line == "wq!" or line == "x" or line == "xit" or line == "exit" then
             return vim.api.nvim_replace_termcodes(
-                '<C-u>lua require("markdown_pane").write_question(' .. scratch .. '); require("markdown_pane").finish_question(' .. scratch .. ')<CR>',
+                '<C-u>lua require("sidepanes").write_question(' .. scratch .. '); require("sidepanes").finish_question(' .. scratch .. ')<CR>',
                 true,
                 false,
                 true

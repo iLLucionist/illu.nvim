@@ -24,15 +24,15 @@ local function current_context()
     local bufnr = vim.api.nvim_get_current_buf()
     local path = vim.api.nvim_buf_get_name(bufnr)
 
-    local ok, markdown_pane = pcall(require, "markdown_pane")
+    local ok, sidepanes = pcall(require, "sidepanes")
     local is_pane = false
     local terminal_ctx = nil
 
-    if ok and valid_buf(markdown_pane.bufnr) and bufnr == markdown_pane.bufnr and markdown_pane.source then
-        path = markdown_pane.source
+    if ok and valid_buf(sidepanes.bufnr) and bufnr == sidepanes.bufnr and sidepanes.source then
+        path = sidepanes.source
         is_pane = true
     elseif ok then
-        for _, ctx in pairs(markdown_pane.terminals or {}) do
+        for _, ctx in pairs(sidepanes.terminals or {}) do
             if valid_buf(ctx.bufnr) and bufnr == ctx.bufnr then
                 terminal_ctx = ctx
                 path = ctx.root
@@ -72,7 +72,7 @@ local function current_context()
         root = root,
         is_pane = is_pane,
         terminal_ctx = terminal_ctx,
-        markdown_pane = ok and markdown_pane or nil,
+        sidepanes = ok and sidepanes or nil,
     }
 end
 
@@ -264,18 +264,18 @@ local function best_buffer_match(target, ctx)
 end
 
 local function is_pane_win(ctx, winid)
-    local pane_winid = ctx.markdown_pane and ctx.markdown_pane.winid or nil
+    local pane_winid = ctx.sidepanes and ctx.sidepanes.winid or nil
     local bufnr = valid_win(winid) and vim.api.nvim_win_get_buf(winid) or nil
 
     if winid == pane_winid then
         return true
     end
 
-    if ctx.markdown_pane and bufnr == ctx.markdown_pane.bufnr then
+    if ctx.sidepanes and bufnr == ctx.sidepanes.bufnr then
         return true
     end
 
-    for _, terminal_ctx in pairs((ctx.markdown_pane and ctx.markdown_pane.terminals) or {}) do
+    for _, terminal_ctx in pairs((ctx.sidepanes and ctx.sidepanes.terminals) or {}) do
         if bufnr == terminal_ctx.bufnr then
             return true
         end
@@ -305,8 +305,8 @@ local function target_window(ctx, bufnr)
         end
     end
 
-    if ctx.is_pane and ctx.markdown_pane then
-        local winid = ctx.markdown_pane.last_focus_win
+    if ctx.is_pane and ctx.sidepanes then
+        local winid = ctx.sidepanes.last_focus_win
 
         if not valid_win(winid) or is_pane_win(ctx, winid) then
             pcall(vim.cmd, "wincmd p")

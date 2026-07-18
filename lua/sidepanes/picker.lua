@@ -1,11 +1,11 @@
 --[[
-markdown_pane.picker
+sidepanes.picker
 Purpose: Render the plugin's lightweight numeric/letter picker.
 Does: Displays entries in a floating buffer, highlights current/running items, and accepts single-key or multi-digit choices without Enter.
 Architecture: Provides a dependency-free picker primitive used by pane switching and ask target selection.
 ]]
 
-local util = require("markdown_pane.util")
+local util = require("sidepanes.util")
 
 local M = {}
 

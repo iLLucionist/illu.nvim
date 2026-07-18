@@ -1,5 +1,5 @@
 --[[
-markdown_pane.defaults
+sidepanes.defaults
 Purpose: Define the plugin's built-in configuration.
 Does: Provides pane layout defaults, reflow behavior, lifecycle settings, and the configured Codex, Claude, and IPython tool presets.
 Architecture: Supplies the initial config table consumed by init.lua and later merged with user overrides during lifecycle setup.

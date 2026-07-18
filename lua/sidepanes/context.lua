@@ -1,13 +1,13 @@
 --[[
-markdown_pane.context
+sidepanes.context
 Purpose: Centralize pane-aware context lookup for buffers, roots, and selections.
 Does: Identifies pane-owned buffers, resolves the project root for markdown and terminal panes, and builds send/ask selection context.
 Architecture: Sits between the public facade and the selection/terminal/util modules so state-dependent lookups stay in one place.
 ]]
 
-local selection = require("markdown_pane.selection")
-local terminal = require("markdown_pane.terminal")
-local util = require("markdown_pane.util")
+local selection = require("sidepanes.selection")
+local terminal = require("sidepanes.terminal")
+local util = require("sidepanes.util")
 
 local M = {}
 

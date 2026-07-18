@@ -1,6 +1,6 @@
 --[[
-markdown_pane.util
-Purpose: Provide small shared helpers used throughout the markdown pane plugin.
+sidepanes.util
+Purpose: Provide small shared helpers used throughout the sidepanes plugin.
 Does: Normalizes paths and roots, validates buffers/windows/jobs, builds terminal commands/keys, and formats safe labels/fences.
 Architecture: Low-level utility module with no pane ownership; higher-level modules depend on it for common Neovim and filesystem operations.
 ]]

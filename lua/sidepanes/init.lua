@@ -1,6 +1,6 @@
 --[[
-markdown_pane.init
-Purpose: Expose the public API and shared state for the markdown pane plugin.
+sidepanes.init
+Purpose: Expose the public API and shared state for the sidepanes plugin.
 Does: Wires together viewer, window, render, switcher, terminal, question, lifecycle, and picker modules through dependency callbacks.
 Architecture: Acts as the facade module required by user config; substantial behavior lives in focused submodules to keep responsibilities separated.
 ]]
@@ -10,22 +10,22 @@ Architecture: Acts as the facade module required by user config; substantial beh
 -- =============================================================================
 
 
-local defaults = require("markdown_pane.defaults")
-local context = require("markdown_pane.context")
-local document_picker = require("markdown_pane.document_picker")
-local entries = require("markdown_pane.entries")
-local heading = require("markdown_pane.heading")
-local lifecycle = require("markdown_pane.lifecycle")
-local maps = require("markdown_pane.maps")
-local picker = require("markdown_pane.picker")
-local question = require("markdown_pane.question")
-local render = require("markdown_pane.render")
-local switcher = require("markdown_pane.switcher")
-local terminal = require("markdown_pane.terminal")
-local util = require("markdown_pane.util")
-local pane_window = require("markdown_pane.window")
-local viewer = require("markdown_pane.viewer")
-local winbar = require("markdown_pane.winbar")
+local defaults = require("sidepanes.defaults")
+local context = require("sidepanes.context")
+local document_picker = require("sidepanes.document_picker")
+local entries = require("sidepanes.entries")
+local heading = require("sidepanes.heading")
+local lifecycle = require("sidepanes.lifecycle")
+local maps = require("sidepanes.maps")
+local picker = require("sidepanes.picker")
+local question = require("sidepanes.question")
+local render = require("sidepanes.render")
+local switcher = require("sidepanes.switcher")
+local terminal = require("sidepanes.terminal")
+local util = require("sidepanes.util")
+local pane_window = require("sidepanes.window")
+local viewer = require("sidepanes.viewer")
+local winbar = require("sidepanes.winbar")
 
 
 -- =============================================================================
@@ -57,9 +57,9 @@ local M = {
 -- =============================================================================
 
 
-local sticky_heading_group = vim.api.nvim_create_augroup("MarkdownPaneStickyHeading", { clear = true })
-local focus_group = vim.api.nvim_create_augroup("MarkdownPaneFocus", { clear = true })
-local shutdown_group = vim.api.nvim_create_augroup("MarkdownPaneShutdown", { clear = true })
+local sticky_heading_group = vim.api.nvim_create_augroup("SidepanesStickyHeading", { clear = true })
+local focus_group = vim.api.nvim_create_augroup("SidepanesFocus", { clear = true })
+local shutdown_group = vim.api.nvim_create_augroup("SidepanesShutdown", { clear = true })
 
 
 -- =============================================================================
@@ -144,7 +144,7 @@ local function pane_text_width(winid)
     return pane_window.text_width(M, winid)
 end
 
---- Save the markdown pane cursor and scroll view for later restoration.
+--- Save the sidepanes cursor and scroll view for later restoration.
 local function save_markdown_view()
     viewer.save_view(M)
 end
@@ -198,7 +198,7 @@ render_markview = function(bufnr)
     render.markview(bufnr)
 end
 
---- Reflow the markdown pane buffer using configured internal or external formatting.
+--- Reflow the sidepanes buffer using configured internal or external formatting.
 local function reflow_pane_buffer(bufnr, opts)
     render.reflow_buffer(M, render_deps(), bufnr, opts)
 end
