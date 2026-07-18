@@ -158,6 +158,26 @@ test("document picker entries preserve display and resolve absolute values", fun
     assert(glob_entry.ordinal == absolute, "glob entry ordinal changed")
 end)
 
+test("setup installs single focus and shutdown autocmds when repeated", function()
+    reset_pane()
+
+    pane.setup({
+        width = 61,
+    })
+    pane.setup({
+        wrap = true,
+    })
+
+    local focus_autocmds = vim.api.nvim_get_autocmds({ group = "MarkdownPaneFocus" })
+    local shutdown_autocmds = vim.api.nvim_get_autocmds({ group = "MarkdownPaneShutdown" })
+
+    assert(#focus_autocmds == 1, "setup duplicated focus autocmds")
+    assert(#shutdown_autocmds == 1, "setup duplicated shutdown autocmds")
+    assert(pane.config.width == 61, "setup lost earlier config merge")
+    assert(pane.config.wrap == true, "setup did not merge later config")
+    assert(pane.config.tools.codex ~= nil, "setup dropped default tools")
+end)
+
 test("pane-local slot maps switch between markdown, agents, and IPython", function()
     reset_pane()
 

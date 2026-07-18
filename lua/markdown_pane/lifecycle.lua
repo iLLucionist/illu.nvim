@@ -1,0 +1,26 @@
+local M = {}
+
+--- Merge user configuration and install pane lifecycle autocmds.
+function M.setup(state, groups, deps, opts)
+    state.config = vim.tbl_deep_extend("force", state.config, opts or {})
+
+    vim.api.nvim_clear_autocmds({ group = groups.focus })
+    vim.api.nvim_create_autocmd("WinEnter", {
+        group = groups.focus,
+        callback = function()
+            deps.record_focus_win()
+        end,
+    })
+
+    vim.api.nvim_clear_autocmds({ group = groups.shutdown })
+    vim.api.nvim_create_autocmd("VimLeavePre", {
+        group = groups.shutdown,
+        callback = function()
+            if state.config.shutdown_on_exit then
+                deps.shutdown_terminals()
+            end
+        end,
+    })
+end
+
+return M

@@ -2,6 +2,7 @@ local defaults = require("markdown_pane.defaults")
 local document_picker = require("markdown_pane.document_picker")
 local entries = require("markdown_pane.entries")
 local heading = require("markdown_pane.heading")
+local lifecycle = require("markdown_pane.lifecycle")
 local maps = require("markdown_pane.maps")
 local picker = require("markdown_pane.picker")
 local question = require("markdown_pane.question")
@@ -289,25 +290,13 @@ end
 
 --- Merge user configuration and install pane autocmds.
 function M.setup(opts)
-    M.config = vim.tbl_deep_extend("force", M.config, opts or {})
-
-    vim.api.nvim_clear_autocmds({ group = focus_group })
-    vim.api.nvim_create_autocmd("WinEnter", {
-        group = focus_group,
-        callback = function()
-            record_focus_win()
-        end,
-    })
-
-    vim.api.nvim_clear_autocmds({ group = shutdown_group })
-    vim.api.nvim_create_autocmd("VimLeavePre", {
-        group = shutdown_group,
-        callback = function()
-            if M.config.shutdown_on_exit then
-                M.shutdown_terminals()
-            end
-        end,
-    })
+    lifecycle.setup(M, {
+        focus = focus_group,
+        shutdown = shutdown_group,
+    }, {
+        record_focus_win = record_focus_win,
+        shutdown_terminals = M.shutdown_terminals,
+    }, opts)
 end
 
 --- Resolve a configured preset by name, label, or default position.
