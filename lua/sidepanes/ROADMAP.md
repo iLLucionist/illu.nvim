@@ -136,11 +136,18 @@ Acceptance:
 - Commands, mappings, config, health checks, and examples are discoverable.
 - `:help sidepanes` resolves after helptags are generated.
 
-### 5. Package Hygiene
+### 5. Package Extraction
 
 Status: in progress.
 
-Prepare Sidepanes as a proper standalone-ish Neovim plugin surface.
+Extract the local plugin work from `illu.nvim` into proper standalone GitHub repositories and make `illu.nvim` consume those plugins like any other Neovim config.
+
+Target repositories:
+
+- `sidepanes.nvim`
+- `markdown-reflow.nvim`
+
+Keep `illu.nvim` as the personal configuration repo that installs and configures both plugins from GitHub.
 
 Completed refinements:
 
@@ -151,12 +158,236 @@ Completed refinements:
 
 Possible work:
 
-- Keep `doc/sidepanes.md` aligned with the help file and README quickstart.
-- Maintain helptags-compatible sections as commands and API evolve.
-- Keep module top-level comments consistent; the audit smoke test now enforces Purpose/Does/Architecture headers.
-- Keep built-in helpers such as `sidepanes.smart_gf` under the Sidepanes namespace unless they are genuinely standalone.
-- Confirm no personal config assumptions leak into plugin modules.
-- Keep personal `init.lua` as a consumer of the public setup/config surface.
+#### 5.1 Extraction Boundary Audit
+
+Prove `lua/sidepanes/**` and `lua/markdown_reflow/**` can stand on their own outside `illu.nvim`.
+
+Check for:
+
+- Hardcoded personal paths.
+- Assumptions about personal mappings.
+- References to personal `init.lua`.
+- Dependence on unrelated local modules.
+- Commands or mappings that only make sense in this personal config.
+- Docs that say "this config" when they should say "default config" or "example config".
+- Tests that append `/Users/maximl/.config/nvim/illu.nvim` instead of resolving the repo root dynamically.
+
+Acceptance:
+
+- The `sidepanes` module tree can be copied into another Neovim config and loaded with `require("sidepanes").setup(...)`.
+- The `markdown_reflow` module tree can be copied into another Neovim config and loaded with `require("markdown_reflow").setup(...)`.
+- Personal `init.lua` remains only a consumer of the public setup/config surface.
+
+#### 5.2 Split `markdown-reflow.nvim`
+
+Create a dedicated Markdown reflow plugin repo:
+
+```text
+markdown-reflow.nvim/
+  README.md
+  LICENSE
+  doc/
+    markdown-reflow.txt
+    tags
+  lua/
+    markdown_reflow/
+      init.lua
+  tests/
+    run_markdown_reflow_checks.sh
+    markdown_reflow_regression.lua
+```
+
+Keep in this repo:
+
+- Internal Markdown reflow.
+- External formatter support, including `mdfmt`.
+- Table protection for external formatting.
+- `:MarkdownReflow`.
+- Configurable standalone reflow mappings.
+- Tests for paragraphs, lists, code fences, tables, external fallback, and table protection.
+
+Acceptance:
+
+- `markdown-reflow.nvim` runs its own checks without loading `sidepanes`.
+- `illu.nvim` can install it from GitHub and keep the existing `<leader>mR` workflow.
+
+#### 5.3 Split `sidepanes.nvim`
+
+Create a dedicated Sidepanes plugin repo:
+
+```text
+sidepanes.nvim/
+  README.md
+  LICENSE
+  doc/
+    sidepanes.txt
+    tags
+  lua/
+    sidepanes/
+      init.lua
+      ...
+  tests/
+    run_sidepanes_checks.sh
+    sidepanes_regression.lua
+    ...
+```
+
+Keep in this repo:
+
+- Pane, window, viewer, switcher, picker, question, and terminal logic.
+- Codex, Claude, and IPython pane support.
+- Ask prompt editor workflow.
+- `sidepanes.smart_gf`.
+- Docs, health checks, defaults, config normalization, presets, mappings, and commands.
+
+Do not keep in this repo:
+
+- Personal `init.lua`.
+- Unrelated local modules such as `svelte_*`.
+- The Markdown reflow implementation itself, except as an optional dependency/integration.
+
+Current leaning:
+
+- Do not add `plugin/sidepanes.lua` initially.
+- Keep Sidepanes setup-driven rather than auto-registering commands/mappings on runtimepath load.
+- Depend softly on `markdown-reflow.nvim`: use `pcall(require, "markdown_reflow")`, health warnings, and graceful degradation if missing.
+
+Acceptance:
+
+- `sidepanes.nvim` runs its checks as a standalone repo.
+- `illu.nvim` can install it from GitHub and keep the current Sidepanes workflow.
+
+#### 5.4 Docs Contract Pass
+
+Keep each documentation surface focused:
+
+- `README.md`: quickstart.
+- `doc/sidepanes.txt`: Neovim-native help reference.
+- `doc/sidepanes.md`: deeper explanation and examples.
+- `lua/sidepanes/ROADMAP.md`: development state, not user docs.
+
+Acceptance:
+
+- Every Sidepanes command in `commands.lua` appears in Sidepanes help/docs.
+- Every Sidepanes public API function appears in Sidepanes help/docs.
+- Every Sidepanes default mapping key appears in Sidepanes help/docs.
+- Every Sidepanes config group appears in Sidepanes help/docs.
+- Every Markdown Reflow command/config/mapping appears in Markdown Reflow help/docs.
+- Help tags remain valid after doc changes in both repos.
+
+#### 5.5 Portable Test / CI Wrapper
+
+Make test scripts portable enough for standalone repos and later GitHub Actions.
+
+Possible work:
+
+- Remove hardcoded personal paths where practical.
+- Resolve repo root dynamically.
+- Exit nonzero on every failed subcheck.
+- Test `:help sidepanes` in `sidepanes.nvim`.
+- Test `:help markdown-reflow` in `markdown-reflow.nvim`.
+- Test `:checkhealth sidepanes`.
+- Test module top-level comments.
+- Consider `fast` and `full` modes.
+
+Target:
+
+```sh
+tests/run_checks.sh fast
+tests/run_checks.sh full
+```
+
+Fast checks:
+
+- Lua regression tests.
+- Docs/help smoke.
+- Health smoke.
+
+Full checks:
+
+- Everything in fast.
+- Real Codex/Claude CLI smoke for Sidepanes when executables exist.
+- External formatter smoke for Markdown Reflow when `mdfmt` exists.
+
+#### 5.6 Update `illu.nvim` To Consume GitHub Plugins
+
+After both repos work locally, update personal config to install them from GitHub.
+
+Target lazy.nvim shape:
+
+```lua
+{
+  "yourname/markdown-reflow.nvim",
+  config = function()
+    require("markdown_reflow").setup({
+      external_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" },
+      external_reflow_protect_tables = true,
+      commands = true,
+      mappings = { reflow = "<leader>mR" },
+    })
+  end,
+}
+
+{
+  "yourname/sidepanes.nvim",
+  dependencies = {
+    "yourname/markdown-reflow.nvim",
+  },
+  config = function()
+    require("sidepanes").setup({
+      -- current personal Sidepanes config
+    })
+  end,
+}
+```
+
+Acceptance:
+
+- `illu.nvim` no longer needs local `lua/sidepanes/**` or `lua/markdown_reflow/**` source.
+- Existing mappings and commands still work from the GitHub-installed plugins.
+- Existing Sidepanes and Markdown Reflow tests pass before removing local source.
+
+#### 5.7 Dependency Contract Pass
+
+Make optional dependencies explicit and consistent.
+
+For each feature document and test:
+
+- Dependency.
+- When it is required.
+- What happens if missing.
+- Health output.
+- Setup validation output.
+- Runtime fallback or warning.
+
+Specific extraction decision:
+
+- `markdown_reflow` becomes a standalone plugin dependency for Sidepanes reflow behavior.
+- Sidepanes should degrade gracefully if `markdown_reflow` is missing.
+- `sidepanes.smart_gf` stays built into `sidepanes.nvim`.
+
+#### 5.8 Compatibility And Deprecation Cleanup
+
+Decide how long compatibility shims remain.
+
+Questions:
+
+- Should `require("smart_gf")` remain available in `sidepanes.nvim`, or only in `illu.nvim` during migration?
+- Should old flat Sidepanes config keys remain permanently supported?
+- Should command aliases be documented as stable or convenience-only?
+
+#### 5.9 Release Readiness Later
+
+Only needed if either plugin is published as a public-ish plugin.
+
+Possible work:
+
+- Add install examples for `lazy.nvim`.
+- Add `CHANGELOG.md`.
+- Decide whether versioning matters.
+- Decide support policy for compatibility shims such as `smart_gf`.
+- Add a minimal GitHub Actions workflow for headless Neovim tests.
+- Consider separate release notes for `sidepanes.nvim` and `markdown-reflow.nvim`.
 
 ### 6. Naming And API Cleanup Later
 
