@@ -2,14 +2,16 @@
 sidepanes.lifecycle
 Purpose: Manage plugin setup-time configuration and global lifecycle autocmds.
 Does: Merges user options and installs focus tracking plus graceful terminal shutdown on Neovim exit.
-Architecture: Keeps autocmd setup separate from init.lua while receiving state and side-effect callbacks from the facade.
+Architecture: Keeps autocmd setup separate from init.lua while delegating user-facing config expansion to config.lua.
 ]]
+
+local config = require("sidepanes.config")
 
 local M = {}
 
 --- Merge user configuration and install pane lifecycle autocmds.
 function M.setup(state, groups, deps, opts)
-    state.config = vim.tbl_deep_extend("force", state.config, opts or {})
+    state.config = config.normalize(state.config, opts or {})
 
     vim.api.nvim_clear_autocmds({ group = groups.focus })
     vim.api.nvim_create_autocmd("WinEnter", {

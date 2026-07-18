@@ -1,9 +1,12 @@
 vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
 local defaults = require("sidepanes.defaults")
+local config = require("sidepanes.config")
 local pane_context = require("sidepanes.context")
 local document_picker = require("sidepanes.document_picker")
 local entries = require("sidepanes.entries")
+local presets = require("sidepanes.presets")
+local util = require("sidepanes.util")
 local markdown_reflow = require("markdown_reflow")
 local pane = require("sidepanes")
 
@@ -177,6 +180,175 @@ test("setup installs single focus and shutdown autocmds when repeated", function
     assert(pane.config.width == 61, "setup lost earlier config merge")
     assert(pane.config.wrap == true, "setup did not merge later config")
     assert(pane.config.tools.codex ~= nil, "setup dropped default tools")
+end)
+
+test("codex preset generator matches the default preset table", function()
+    local tool = presets.codex({
+        models = { "gpt-5.5", "gpt-5.6-sol" },
+        efforts = { "high", "medium", "xhigh" },
+        speeds = { "fast", "normal" },
+        default = { model = "gpt-5.5", effort = "high", speed = "fast" },
+    })
+
+    assert(vim.deep_equal(tool.presets, defaults.config.tools.codex.presets), "generated Codex presets changed default shape")
+end)
+
+test("config normalizes ergonomic markdown and tool setup", function()
+    reset_pane()
+
+    pane.setup({
+        markdown = {
+            wrap = true,
+            reflow = {
+                enabled = false,
+                cmd = { "mdfmt", "--stdin", "--width", "{width}" },
+                fallback = false,
+                protect_tables = false,
+                margin = 12,
+            },
+        },
+        tools = {
+            codex = {
+                cmd = { "sh", "-c", "sleep 10" },
+                models = { "gpt-5.5", "gpt-5.6-sol" },
+                efforts = { "high", "medium" },
+                speeds = { "fast", "normal" },
+                default = { model = "gpt-5.6-sol", effort = "medium", speed = "normal" },
+            },
+            claude = false,
+        },
+    })
+
+    assert(pane.config.markdown == nil, "ergonomic markdown table leaked into runtime config")
+    assert(pane.config.wrap == true, "markdown.wrap did not map to wrap")
+    assert(pane.config.auto_reflow == false, "markdown.reflow.enabled did not map to auto_reflow")
+    assert(pane.config.external_reflow_cmd[1] == "mdfmt", "markdown.reflow.cmd did not map to external_reflow_cmd")
+    assert(pane.config.external_reflow_fallback == false, "markdown.reflow.fallback did not map to external_reflow_fallback")
+    assert(pane.config.external_reflow_protect_tables == false, "markdown.reflow.protect_tables did not map to external_reflow_protect_tables")
+    assert(pane.config.reflow_margin == 12, "markdown.reflow.margin did not map to reflow_margin")
+    assert(pane.config.tools.claude == nil, "disabled tool was still present")
+    assert(pane.config.tools.codex.cmd[1] == "sh", "generated tool lost explicit command override")
+    assert(pane.config.tools.codex.presets[1].name == "gpt56_sol_medium_normal", "default generated preset was not first")
+    assert(pane.config.tools.codex.presets[1].model == "gpt-5.6-sol", "generated preset model was wrong")
+    assert(pane.config.tools.codex.presets[1].effort == "medium", "generated preset effort was wrong")
+    assert(pane.config.tools.codex.presets[1].speed == "normal", "generated preset speed was wrong")
+end)
+
+test("config expansion leaves legacy presets intact", function()
+    local legacy = {
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = {
+                    { name = "custom", label = "Custom", args = { "--custom" } },
+                },
+            },
+        },
+    }
+    local normalized = config.normalize(vim.deepcopy(defaults.config), legacy)
+
+    assert(normalized.tools.codex.presets[1].name == "custom", "legacy preset name changed")
+    assert(normalized.tools.codex.presets[1].label == "Custom", "legacy preset label changed")
+    assert(normalized.tools.codex.presets[1].args[1] == "--custom", "legacy preset args changed")
+    assert(normalized.tools.codex.presets[1].model == nil, "legacy preset gained generated model")
+    assert(normalized.tools.codex.presets[1].effort == nil, "legacy preset gained generated effort")
+    assert(normalized.tools.codex.presets[1].speed == nil, "legacy preset gained generated speed")
+    assert(normalized.tools.codex.presets[2] == nil, "legacy preset list did not replace defaults")
+end)
+
+test("preset generators derive presets from default-only ergonomic config", function()
+    local normalized = config.normalize(vim.deepcopy(defaults.config), {
+        tools = {
+            codex = {
+                default = { model = "gpt-5.6-sol", effort = "high", speed = "fast" },
+            },
+            claude = {
+                default = { model = "opus", effort = "high" },
+            },
+        },
+    })
+
+    local codex_preset = normalized.tools.codex.presets[1]
+    local claude_preset = normalized.tools.claude.presets[1]
+    local cmd = util.command_list(normalized.tools.codex, codex_preset, "/tmp/project")
+
+    assert(#normalized.tools.codex.presets == 1, "default-only Codex config generated extra presets")
+    assert(codex_preset.name == "gpt56_sol_high_fast", "default-only Codex preset name was wrong")
+    assert(codex_preset.label == "GPT-5.6 Sol / high / fast", "default-only Codex preset label was wrong")
+    assert(cmd[1] == "codex", "generated Codex command did not use default cmd")
+    assert(cmd[2] == "--cd" and cmd[3] == "/tmp/project", "generated Codex command lost --cd root")
+    assert(vim.tbl_contains(cmd, "gpt-5.6-sol"), "generated Codex command lost model")
+    assert(vim.tbl_contains(cmd, 'model_reasoning_effort="high"'), "generated Codex command lost effort")
+    assert(vim.tbl_contains(cmd, 'service_tier="priority"'), "generated Codex fast command lost priority tier")
+    assert(#normalized.tools.claude.presets == 1, "default-only Claude config generated extra presets")
+    assert(claude_preset.name == "opus_high", "default-only Claude preset name was wrong")
+    assert(claude_preset.label == "Opus / high", "default-only Claude preset label was wrong")
+end)
+
+test("preset generators fill missing ergonomic dimensions", function()
+    local normalized = config.normalize(vim.deepcopy(defaults.config), {
+        tools = {
+            codex = {
+                model = "gpt-5.6-sol",
+            },
+            claude = {
+                model = "opus",
+            },
+        },
+    })
+
+    local codex_preset = normalized.tools.codex.presets[1]
+    local claude_preset = normalized.tools.claude.presets[1]
+
+    assert(#normalized.tools.codex.presets == 1, "model-only Codex config generated wrong preset count")
+    assert(codex_preset.name == "gpt56_sol_high_fast", "model-only Codex preset name was wrong")
+    assert(codex_preset.label == "GPT-5.6 Sol / high / fast", "model-only Codex preset label was wrong")
+    assert(codex_preset.effort == "high", "model-only Codex preset did not default effort")
+    assert(codex_preset.speed == "fast", "model-only Codex preset did not default speed")
+    assert(vim.tbl_contains(codex_preset.args, 'service_tier="priority"'), "fast Codex preset lost priority tier")
+    assert(#normalized.tools.claude.presets == 1, "model-only Claude config generated wrong preset count")
+    assert(claude_preset.name == "opus", "model-only Claude preset name was wrong")
+    assert(claude_preset.label == "Opus / normal", "model-only Claude preset label was wrong")
+    assert(claude_preset.effort == "medium", "model-only Claude preset did not default effort")
+end)
+
+test("preset generators use default models for effort-only config", function()
+    local normalized = config.normalize(vim.deepcopy(defaults.config), {
+        tools = {
+            codex = {
+                effort = "medium",
+                speed = "fast",
+            },
+            claude = {
+                effort = "high",
+            },
+        },
+    })
+
+    local codex_preset = normalized.tools.codex.presets[1]
+    local claude_preset = normalized.tools.claude.presets[1]
+
+    assert(codex_preset.model == "gpt-5.5", "effort-only Codex config did not default model")
+    assert(codex_preset.name == "gpt55_medium_fast", "effort-only Codex preset name was wrong")
+    assert(claude_preset.model == "sonnet", "effort-only Claude config did not default model")
+    assert(claude_preset.name == "sonnet_high", "effort-only Claude preset name was wrong")
+end)
+
+test("empty preset helpers match plugin default choices", function()
+    local codex = presets.codex({})
+    local claude = presets.claude({})
+    local codex_preset = codex.presets[1]
+    local claude_preset = claude.presets[1]
+
+    assert(codex_preset.name == "gpt55_high_fast", "empty Codex helper did not use default preset")
+    assert(codex_preset.label == "GPT-5.5 / high / fast", "empty Codex helper label was wrong")
+    assert(codex_preset.model == "gpt-5.5", "empty Codex helper model was wrong")
+    assert(codex_preset.speed == "fast", "empty Codex helper speed was wrong")
+    assert(claude_preset.name == "sonnet", "empty Claude helper did not use default preset")
+    assert(claude_preset.label == "Sonnet / normal", "empty Claude helper label was wrong")
+    assert(claude_preset.model == "sonnet", "empty Claude helper model was wrong")
+    assert(claude_preset.effort == "medium", "empty Claude helper effort was wrong")
 end)
 
 test("context identifies pane buffers and resolves pane roots", function()
