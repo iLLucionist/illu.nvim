@@ -213,6 +213,55 @@ test("public IPython send captures current line through terminal deps", function
     wait_for_file(out, "value = 41 + 1")
 end)
 
+test("visual IPython send exits visual mode after capture", function()
+    reset_pane()
+
+    local root = root_fixture("ipython-visual-exit-test")
+    local out = "/private/tmp/illu-ipython-visual-exit.txt"
+
+    pcall(vim.fn.delete, out)
+    write(root .. "/src/origin.py", {
+        "first = 1",
+        "second = 2",
+        "third = 3",
+    })
+
+    pane.setup({
+        tools = {
+            ipython = {
+                label = "IPython",
+                ask = false,
+                cmd = { "sh", "-c", "tee -a " .. out },
+                send_delay_ms = 0,
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    vim.cmd.edit(root .. "/src/origin.py")
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+    vim.cmd("normal! Vj")
+
+    local visual_mode = vim.fn.mode(1)
+
+    assert(visual_mode:match("[vV\22]"), "test did not enter visual mode")
+
+    pane.send_ipython({
+        bufnr = vim.api.nvim_get_current_buf(),
+        visual = true,
+        visual_mode = visual_mode,
+    })
+
+    wait_for_file(out, "first = 1")
+    wait_for_file(out, "second = 2")
+
+    local exited = vim.wait(500, function()
+        return not vim.fn.mode(1):match("[vV\22]")
+    end, 20)
+
+    assert(exited, "visual mode remained active after send")
+end)
+
 test("visual-line ask captures all selected lines", function()
     reset_pane()
 

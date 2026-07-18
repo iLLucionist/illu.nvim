@@ -350,6 +350,12 @@ function M.send_ipython(state, deps, opts)
     if ctx then
         M.send_to_terminal(ctx, context.text, started)
     end
+
+    if opts.visual and opts.exit_visual ~= false then
+        local esc = vim.api.nvim_replace_termcodes("<Esc>", true, false, true)
+
+        vim.api.nvim_feedkeys(esc, "n", false)
+    end
 end
 
 --- Clear the running IPython terminal screen.
