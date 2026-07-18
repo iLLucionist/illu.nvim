@@ -8,7 +8,9 @@ local document_picker = require("sidepanes.document_picker")
 local entries = require("sidepanes.entries")
 local global_maps = require("sidepanes.global_maps")
 local health = require("sidepanes.health")
+local heading_picker = require("sidepanes.heading_picker")
 local local_maps = require("sidepanes.maps")
+local nvim_tree_integration = require("sidepanes.integrations.nvim_tree")
 local presets = require("sidepanes.presets")
 local util = require("sidepanes.util")
 local markdown_reflow = require("markdown_reflow")
@@ -310,6 +312,78 @@ test("document picker entries preserve display and resolve absolute values", fun
     assert(glob_entry.ordinal == absolute, "glob entry ordinal changed")
 end)
 
+test("heading picker collects markdown headings with levels and cleaned titles", function()
+    local bufnr = vim.api.nvim_create_buf(false, true)
+
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {
+        "# Top",
+        "",
+        "## Child ##",
+        "",
+        "Setext Child",
+        "------------",
+        "",
+        "paragraph",
+    })
+
+    local headings, err = heading_picker.collect(bufnr)
+
+    assert(headings, err or "heading collector failed")
+    assert(#headings == 3, "heading collector returned wrong count: " .. tostring(#headings))
+    assert(headings[1].lnum == 1 and headings[1].level == 1 and headings[1].title == "Top", "top heading changed")
+    assert(headings[2].lnum == 3 and headings[2].level == 2 and headings[2].title == "Child", "ATX heading cleanup changed")
+    assert(headings[3].lnum == 5 and headings[3].level == 2 and headings[3].title == "Setext Child", "Setext heading changed")
+end)
+
+test("nvim-tree integration filters pane and plugin windows", function()
+    vim.cmd("silent! only")
+
+    local winid = vim.api.nvim_get_current_win()
+    local bufnr = vim.api.nvim_get_current_buf()
+
+    vim.api.nvim_set_option_value("buftype", "", { buf = bufnr })
+    vim.api.nvim_set_option_value("filetype", "python", { buf = bufnr })
+    assert(nvim_tree_integration.usable_window({}, winid), "normal file window was not usable")
+    assert(not nvim_tree_integration.usable_window({ winid = winid }, winid), "pane window was usable")
+    assert(not nvim_tree_integration.usable_window({ bufnr = bufnr }, winid), "pane buffer was usable")
+
+    vim.api.nvim_set_option_value("filetype", "NvimTree", { buf = bufnr })
+    assert(not nvim_tree_integration.usable_window({}, winid), "NvimTree window was usable")
+    vim.api.nvim_set_option_value("filetype", "python", { buf = bufnr })
+    vim.api.nvim_set_option_value("buftype", "nofile", { buf = bufnr })
+    assert(not nvim_tree_integration.usable_window({}, winid), "nofile window was usable")
+    vim.api.nvim_set_option_value("buftype", "", { buf = bufnr })
+end)
+
+test("nvim-tree integration prefers alternate non-pane window", function()
+    reset_pane()
+    vim.cmd("silent! only")
+
+    local target_win = vim.api.nvim_get_current_win()
+    local target_buf = vim.api.nvim_get_current_buf()
+
+    vim.api.nvim_set_option_value("buftype", "", { buf = target_buf })
+    vim.api.nvim_set_option_value("filetype", "python", { buf = target_buf })
+    vim.cmd("vsplit")
+
+    local pane_win = vim.api.nvim_get_current_win()
+    local pane_buf = vim.api.nvim_create_buf(false, true)
+    local old_winid = pane.winid
+    local old_bufnr = pane.bufnr
+
+    vim.api.nvim_win_set_buf(pane_win, pane_buf)
+    pane.winid = pane_win
+    pane.bufnr = pane_buf
+
+    local picked = nvim_tree_integration.file_target_picker()
+
+    pane.winid = old_winid
+    pane.bufnr = old_bufnr
+
+    assert(picked == target_win, "nvim-tree picker did not prefer alternate non-pane window")
+    vim.cmd("silent! only")
+end)
+
 test("setup installs single focus and shutdown autocmds when repeated", function()
     reset_pane()
 
@@ -343,6 +417,9 @@ test("command registration invokes facade callbacks", function()
         pick = function()
             calls.pick = true
         end,
+        pick_headings = function()
+            calls.headings = true
+        end,
         switch_picker = function()
             calls.switch = true
         end,
@@ -373,6 +450,7 @@ test("command registration invokes facade callbacks", function()
     }, {
         toggle = "SidepanesTestToggle",
         pick = "SidepanesTestPick",
+        headings = "SidepanesTestHeadings",
         switch = "SidepanesTestSwitch",
         tool = "SidepanesTestTool",
         codex = "SidepanesTestCodex",
@@ -391,6 +469,8 @@ test("command registration invokes facade callbacks", function()
     assert(calls.toggle == "docs/demo.md", "toggle command did not forward optional path")
     vim.cmd("SidepanesTestPick")
     assert(calls.pick == true, "pick command did not call pick")
+    vim.cmd("SidepanesTestHeadings")
+    assert(calls.headings == true, "headings command did not call pick_headings")
     vim.cmd("SidepanesTestSwitch")
     assert(calls.switch == true, "switch command did not call switch picker")
     vim.cmd("SidepanesTestTool codex review")
@@ -437,6 +517,9 @@ test("global map registration invokes facade callbacks", function()
         pick = function()
             calls.pick = true
         end,
+        pick_headings = function()
+            calls.headings = true
+        end,
         show_markdown = function()
             calls.markdown = true
         end,
@@ -476,6 +559,7 @@ test("global map registration invokes facade callbacks", function()
     }, {
         toggle = "<leader>zt",
         pick = "<leader>zk",
+        headings = "<leader>zh",
         markdown = "<leader>z0",
         codex = "<leader>zx",
         claude = "<leader>zc",
@@ -496,6 +580,8 @@ test("global map registration invokes facade callbacks", function()
     assert(calls.toggle == true, "toggle map did not call toggle")
     global_map("<leader>zk").callback()
     assert(calls.pick == true, "pick map did not call pick")
+    global_map("<leader>zh").callback()
+    assert(calls.headings == true, "headings map did not call pick_headings")
     global_map("<leader>z0").callback()
     assert(calls.markdown == true, "markdown map did not call show_markdown")
     global_map("<leader>zx").callback()
@@ -1669,6 +1755,40 @@ test("external mdfmt reflow preserves markdown tables", function()
     end
 
     assert(vim.deep_equal(found, table_block), table.concat(output, "\n"))
+end)
+
+test("markdown reflow setup registers command and mapping", function()
+    markdown_reflow.setup({
+        external_reflow_cmd = false,
+        commands = {
+            reflow = "MarkdownReflowRegression",
+        },
+        mappings = {
+            reflow = "<leader>ZR",
+        },
+    })
+
+    local command_buf = vim.api.nvim_create_buf(false, true)
+
+    vim.api.nvim_set_current_buf(command_buf)
+    vim.api.nvim_buf_set_lines(command_buf, 0, -1, false, {
+        "This paragraph is deliberately long enough to wrap when the MarkdownReflowRegression command uses a narrow width.",
+    })
+    vim.cmd("MarkdownReflowRegression 34")
+    assert(vim.api.nvim_buf_line_count(command_buf) > 1, "MarkdownReflow command did not reflow current buffer")
+
+    local mapping_buf = vim.api.nvim_create_buf(false, true)
+
+    vim.api.nvim_set_current_buf(mapping_buf)
+    vim.api.nvim_set_option_value("textwidth", 34, { buf = mapping_buf })
+    vim.api.nvim_buf_set_lines(mapping_buf, 0, -1, false, {
+        "This paragraph is deliberately long enough to wrap when the configured Markdown reflow mapping is invoked.",
+    })
+
+    local map = global_map("<leader>ZR")
+
+    map.callback()
+    assert(vim.api.nvim_buf_line_count(mapping_buf) > 1, "MarkdownReflow mapping did not reflow current buffer")
 end)
 
 test("toggle wrap updates markdown window wrap options", function()

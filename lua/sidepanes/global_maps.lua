@@ -46,6 +46,10 @@ function M.setup(api, mappings)
         api.pick()
     end, "Pick sidepanes document")
 
+    map("n", mappings.headings, function()
+        api.pick_headings()
+    end, "Pick markdown heading")
+
     map("n", mappings.markdown, function()
         api.show_markdown()
     end, "Show markdown viewer")

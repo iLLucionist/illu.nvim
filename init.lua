@@ -362,192 +362,6 @@ map('n', '<leader>fd', builtin.buffers, {})
 map('n', '<leader>fh', builtin.help_tags, {})
 map('n', '<leader>fp', function() require'telescope'.extensions.project.project{} end, {})
 
-local function markdown_headings()
-    local pickers = require("telescope.pickers")
-    local finders = require("telescope.finders")
-    local entry_display = require("telescope.pickers.entry_display")
-    local previewers = require("telescope.previewers")
-    local preview_utils = require("telescope.previewers.utils")
-    local conf = require("telescope.config").values
-    local actions = require("telescope.actions")
-    local action_state = require("telescope.actions.state")
-    local sidepanes = require("sidepanes")
-    local headings = {}
-    local origin_win = vim.api.nvim_get_current_win()
-    local pane_visible = sidepanes.is_open()
-    local bufnr = pane_visible and sidepanes.bufnr or vim.api.nvim_get_current_buf()
-    local target_win = pane_visible and sidepanes.winid or origin_win
-    local ok, parser = pcall(vim.treesitter.get_parser, bufnr, "markdown")
-
-    if not ok or not parser then
-        vim.notify("No markdown parser available", vim.log.levels.WARN)
-        return
-    end
-
-    local function heading_level(node)
-        for child in node:iter_children() do
-            local node_type = child:type()
-
-            if node_type:match("^atx_h%d_marker$") then
-                return tonumber(node_type:match("%d")) or 1
-            elseif node_type == "setext_h1_underline" then
-                return 1
-            elseif node_type == "setext_h2_underline" then
-                return 2
-            end
-        end
-
-        return 1
-    end
-
-    local function clean_heading_title(text)
-        text = text:gsub("%s+", " ")
-        text = text:gsub("^%s+", "")
-        text = text:gsub("%s+#+%s*$", "")
-        text = text:gsub("%s+$", "")
-
-        return text
-    end
-
-    local heading_icons = {
-        [1] = "󰉫",
-        [2] = "󰉬",
-        [3] = "󰉭",
-        [4] = "󰉮",
-        [5] = "󰉯",
-        [6] = "󰉰",
-    }
-
-    local function visit(node)
-        local node_type = node:type()
-
-        if node_type == "atx_heading" or node_type == "setext_heading" then
-            local content = node:field("heading_content")[1]
-
-            if content then
-                local start_row = node:range()
-                local title = clean_heading_title(vim.treesitter.get_node_text(content, bufnr))
-
-                table.insert(headings, {
-                    lnum = start_row + 1,
-                    level = heading_level(node),
-                    title = title,
-                })
-            end
-        end
-
-        for child in node:iter_children() do
-            visit(child)
-        end
-    end
-
-    for _, tree in ipairs(parser:parse()) do
-        visit(tree:root())
-    end
-
-    table.sort(headings, function(a, b)
-        return a.lnum < b.lnum
-    end)
-
-    if vim.tbl_isempty(headings) then
-        vim.notify("No markdown headings found", vim.log.levels.INFO)
-        return
-    end
-
-    local displayer = entry_display.create({
-        separator = " ",
-        items = {
-            { width = 4 },
-            { width = 2 },
-            { remaining = true },
-        },
-    })
-
-    pickers.new({}, {
-        prompt_title = "Markdown Headings",
-        finder = finders.new_table({
-            results = headings,
-            entry_maker = function(entry)
-                local indent = string.rep("  ", entry.level - 1)
-                local icon = heading_icons[entry.level] or "󰉫"
-
-                return {
-                    value = entry,
-                    ordinal = string.format("%d %s", entry.lnum, entry.title),
-                    display = function()
-                        return displayer({
-                            { string.format("%4d", entry.lnum), "LineNr" },
-                            { icon, "MarkviewHeading" .. entry.level },
-                            indent .. entry.title,
-                        })
-                    end,
-                    lnum = entry.lnum,
-                }
-            end,
-        }),
-        previewer = previewers.new_buffer_previewer({
-            title = "Markdown preview",
-            get_buffer_by_name = function()
-                return "markdown_headings_" .. tostring(bufnr)
-            end,
-            define_preview = function(self, entry)
-                if not self.state.bufname then
-                    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-
-                    vim.api.nvim_set_option_value("modifiable", true, { buf = self.state.bufnr })
-                    vim.api.nvim_buf_set_lines(self.state.bufnr, 0, -1, false, lines)
-                    vim.api.nvim_set_option_value("filetype", "markdown", { buf = self.state.bufnr })
-                    vim.api.nvim_set_option_value("modifiable", false, { buf = self.state.bufnr })
-                    preview_utils.highlighter(self.state.bufnr, "markdown")
-                end
-
-                if self.state.winid and vim.api.nvim_win_is_valid(self.state.winid) then
-                    local line_count = vim.api.nvim_buf_line_count(self.state.bufnr)
-                    local target = math.min(entry.value.lnum, line_count)
-
-                    vim.api.nvim_set_option_value("number", true, { win = self.state.winid })
-                    vim.api.nvim_set_option_value("relativenumber", false, { win = self.state.winid })
-                    vim.api.nvim_set_option_value("cursorline", true, { win = self.state.winid })
-                    vim.api.nvim_set_option_value("wrap", false, { win = self.state.winid })
-                    vim.api.nvim_win_set_cursor(self.state.winid, { target, 0 })
-                    vim.api.nvim_win_call(self.state.winid, function()
-                        vim.cmd("normal! zz")
-                    end)
-                end
-            end,
-        }),
-        sorter = conf.generic_sorter({}),
-        attach_mappings = function(prompt_bufnr, telescope_map)
-            telescope_map("i", "<C-n>", actions.move_selection_next)
-            telescope_map("i", "<C-p>", actions.move_selection_previous)
-            telescope_map("n", "<C-n>", actions.move_selection_next)
-            telescope_map("n", "<C-p>", actions.move_selection_previous)
-
-            actions.select_default:replace(function()
-                local selection = action_state.get_selected_entry()
-                actions.close(prompt_bufnr)
-
-                if not selection or not vim.api.nvim_win_is_valid(target_win) then
-                    return
-                end
-
-                vim.api.nvim_win_call(target_win, function()
-                    vim.api.nvim_win_set_cursor(0, { selection.value.lnum, 0 })
-                    vim.cmd("normal! zz")
-                end)
-
-                if pane_visible and vim.api.nvim_win_is_valid(origin_win) then
-                    vim.api.nvim_set_current_win(origin_win)
-                end
-            end)
-
-            return true
-        end,
-    }):find()
-end
-
-map('n', '<leader>fm', markdown_headings, {})
-
 local sidepanes = require("sidepanes")
 local markdown_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" }
 
@@ -559,6 +373,7 @@ sidepanes.setup({
         global = {
             toggle = "<leader>pp",
             pick = "<leader>mP",
+            headings = "<leader>fm",
             markdown = "<leader>p0",
             codex = "<leader>px",
             claude = "<leader>pc",
@@ -582,15 +397,11 @@ local markdown_reflow = require("markdown_reflow")
 markdown_reflow.setup({
     external_reflow_cmd = markdown_reflow_cmd,
     external_reflow_protect_tables = true,
+    commands = true,
+    mappings = {
+        reflow = "<leader>mR",
+    },
 })
-
-vim.api.nvim_create_user_command("MarkdownReflow", function(opts)
-    markdown_reflow.reflow_buffer(0, { width = tonumber(opts.args) })
-end, { nargs = "?" })
-
-map('n', '<leader>mR', function()
-    markdown_reflow.reflow_buffer(0)
-end, {})
 
 local fb_actions = require("telescope").extensions.file_browser.actions
 local telescope_action_state = require("telescope.actions.state")
@@ -932,60 +743,7 @@ require("nvim-surround").setup()
 
 -- Tree sidebar files
 
-local function nvim_tree_file_target_picker()
-    local ok, sidepanes = pcall(require, "sidepanes")
-    local pane_winid = ok and sidepanes.winid or nil
-    local pane_bufnr = ok and sidepanes.bufnr or nil
-    local alternate_winid = vim.fn.win_getid(vim.fn.winnr("#"))
-    local candidates = {}
-
-    local function usable(winid)
-        if not vim.api.nvim_win_is_valid(winid) then
-            return false
-        end
-
-        if winid == pane_winid then
-            return false
-        end
-
-        local config = vim.api.nvim_win_get_config(winid)
-
-        if not config.focusable or config.hide or config.external then
-            return false
-        end
-
-        local bufnr = vim.api.nvim_win_get_buf(winid)
-
-        if bufnr == pane_bufnr then
-            return false
-        end
-
-        local buftype = vim.api.nvim_get_option_value("buftype", { buf = bufnr })
-        local filetype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
-
-        if vim.tbl_contains({ "nofile", "terminal", "help" }, buftype) then
-            return false
-        end
-
-        if vim.tbl_contains({ "NvimTree", "notify", "lazy", "qf", "diff", "fugitive", "fugitiveblame" }, filetype) then
-            return false
-        end
-
-        return true
-    end
-
-    if usable(alternate_winid) then
-        return alternate_winid
-    end
-
-    for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
-        if usable(winid) then
-            table.insert(candidates, winid)
-        end
-    end
-
-    return candidates[1] or -1
-end
+local nvim_tree_file_target_picker = require("sidepanes.integrations.nvim_tree").file_target_picker
 
 require("nvim-tree").setup({
     actions = {

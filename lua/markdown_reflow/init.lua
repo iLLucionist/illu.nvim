@@ -1,25 +1,59 @@
+--[[
+markdown_reflow
+Purpose: Reflow Markdown buffers with an internal formatter or an optional external formatter.
+Does: Preserves protected regions, optionally masks tables for external tools, computes sensible widths, and registers optional commands/mappings.
+Architecture: Companion markdown utility used directly from user config and indirectly by Sidepanes render logic.
+]]
+
 local M = {
     config = {
         external_reflow_cmd = nil,
         external_reflow_fallback = true,
         external_reflow_protect_tables = true,
+        commands = false,
+        mappings = {
+            reflow = false,
+        },
     },
 }
 
-function M.setup(opts)
-    M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+local register_commands
+local register_mappings
+
+--- Return command names from a boolean or table setup value.
+local function command_names(config)
+    if not config then
+        return nil
+    end
+
+    if config == true then
+        return {
+            reflow = "MarkdownReflow",
+        }
+    end
+
+    if type(config) == "table" then
+        return vim.tbl_deep_extend("force", {
+            reflow = "MarkdownReflow",
+        }, config)
+    end
+
+    return nil
 end
 
+--- Trim leading and trailing whitespace from text.
 local function trim(text)
     local trimmed = text:gsub("^%s+", ""):gsub("%s+$", "")
 
     return trimmed
 end
 
+--- Return the display width of text in the current Neovim UI.
 local function display_width(text)
     return vim.fn.strdisplaywidth(text)
 end
 
+--- Resolve the target reflow width from options, Sidepanes, textwidth, or default.
 local function target_width(opts)
     if opts and opts.width and opts.width > 0 then
         return opts.width
@@ -543,6 +577,41 @@ function M.reflow_buffer(bufnr, opts)
     end
 
     return paragraph_count
+end
+
+--- Register configured MarkdownReflow user commands.
+register_commands = function()
+    local names = command_names(M.config.commands)
+
+    if not names then
+        return
+    end
+
+    if names.reflow then
+        vim.api.nvim_create_user_command(names.reflow, function(opts)
+            M.reflow_buffer(0, { width = tonumber(opts.args) })
+        end, { nargs = "?", force = true })
+    end
+end
+
+--- Register configured markdown reflow keymaps.
+register_mappings = function()
+    local mappings = M.config.mappings or {}
+
+    if mappings == false or not mappings.reflow then
+        return
+    end
+
+    vim.keymap.set("n", mappings.reflow, function()
+        M.reflow_buffer(0)
+    end, { desc = "Reflow Markdown" })
+end
+
+--- Merge configuration and install optional commands and mappings.
+function M.setup(opts)
+    M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+    register_commands()
+    register_mappings()
 end
 
 return M

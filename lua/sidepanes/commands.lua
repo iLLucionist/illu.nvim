@@ -10,6 +10,7 @@ local M = {}
 local default_names = {
     toggle = "SidepanesToggle",
     pick = "SidepanesPick",
+    headings = "SidepanesHeadings",
     switch = "PaneSwitch",
     tool = "PaneTool",
     codex = "PaneCodex",
@@ -75,6 +76,10 @@ function M.setup(api, config)
 
     command(names.pick, function()
         api.pick()
+    end, {})
+
+    command(names.headings, function()
+        api.pick_headings()
     end, {})
 
     command(names.switch, function()

@@ -17,6 +17,7 @@ local document_picker = require("sidepanes.document_picker")
 local entries = require("sidepanes.entries")
 local global_maps = require("sidepanes.global_maps")
 local heading = require("sidepanes.heading")
+local heading_picker = require("sidepanes.heading_picker")
 local lifecycle = require("sidepanes.lifecycle")
 local maps = require("sidepanes.maps")
 local picker = require("sidepanes.picker")
@@ -574,6 +575,11 @@ end
 --- Pick a markdown document and open it in the pane.
 function M.pick()
     document_picker.pick(M.open)
+end
+
+--- Pick a markdown heading in the current buffer or Sidepanes viewer.
+function M.pick_headings()
+    heading_picker.pick(M)
 end
 
 

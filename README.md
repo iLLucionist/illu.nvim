@@ -31,6 +31,7 @@ require("sidepanes").setup({
     global = {
       toggle = "<leader>pp",
       markdown = "<leader>p0",
+      headings = "<leader>fm",
       codex = "<leader>px",
       claude = "<leader>pc",
       ipython = "<leader>pi",
@@ -61,3 +62,16 @@ For reusable generated tool tables, use `require("sidepanes.presets").codex(...)
 Set `commands = true` to register the default `:Sidepanes*` and `:Pane*` commands. Set `mappings.global` to a table to install global mappings. `mappings.pane` customizes buffer-local pane mappings; set an entry to `false` to disable it.
 
 Run `:checkhealth sidepanes` to inspect external commands, optional dependencies, tool presets, command registration, and mapping configuration.
+
+Standalone Markdown reflow commands and mappings are configured through `markdown_reflow`:
+
+```lua
+require("markdown_reflow").setup({
+  external_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" },
+  external_reflow_protect_tables = true,
+  commands = true,
+  mappings = {
+    reflow = "<leader>mR",
+  },
+})
+```
