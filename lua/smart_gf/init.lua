@@ -25,18 +25,28 @@ local function current_context()
     local path = vim.api.nvim_buf_get_name(bufnr)
 
     local ok, markdown_pane = pcall(require, "markdown_pane")
-    local is_markdown_pane = false
+    local is_pane = false
+    local terminal_ctx = nil
 
     if ok and valid_buf(markdown_pane.bufnr) and bufnr == markdown_pane.bufnr and markdown_pane.source then
         path = markdown_pane.source
-        is_markdown_pane = true
+        is_pane = true
+    elseif ok then
+        for _, ctx in pairs(markdown_pane.terminals or {}) do
+            if valid_buf(ctx.bufnr) and bufnr == ctx.bufnr then
+                terminal_ctx = ctx
+                path = ctx.root
+                is_pane = true
+                break
+            end
+        end
     end
 
     path = normalize_path(path)
 
-    local root = nil
+    local root = terminal_ctx and normalize_path(terminal_ctx.root) or nil
 
-    if path then
+    if path and not root then
         if vim.fs and vim.fs.root then
             root = vim.fs.root(path, { ".git", "pyproject.toml", "package.json", "Cargo.toml", "go.mod" })
         end
@@ -60,7 +70,8 @@ local function current_context()
         path = path,
         dir = path and vim.fn.fnamemodify(path, ":h") or vim.fn.getcwd(),
         root = root,
-        is_markdown_pane = is_markdown_pane,
+        is_pane = is_pane,
+        terminal_ctx = terminal_ctx,
         markdown_pane = ok and markdown_pane or nil,
     }
 end
@@ -75,7 +86,20 @@ local function clean_target(target)
         return nil
     end
 
-    return target ~= "" and target or nil
+    local line = target:match(":(%d+)$")
+
+    if line then
+        target = target:gsub(":%d+$", "")
+    else
+        local current_line = vim.api.nvim_get_current_line()
+        local matched_line = current_line:match(vim.pesc(target) .. ":(%d+)")
+
+        if matched_line then
+            line = matched_line
+        end
+    end
+
+    return target ~= "" and target or nil, line and tonumber(line) or nil
 end
 
 local function exact_candidates(target, ctx)
@@ -89,7 +113,7 @@ local function exact_candidates(target, ctx)
         end
     end
 
-    if target:sub(1, 1) == "/" then
+    if target:sub(1, 1) == "/" or target:sub(1, 1) == "~" then
         add(target)
     else
         add(ctx.dir .. "/" .. target)
@@ -239,24 +263,63 @@ local function best_buffer_match(target, ctx)
     return nil
 end
 
+local function is_pane_win(ctx, winid)
+    local pane_winid = ctx.markdown_pane and ctx.markdown_pane.winid or nil
+    local bufnr = valid_win(winid) and vim.api.nvim_win_get_buf(winid) or nil
+
+    if winid == pane_winid then
+        return true
+    end
+
+    if ctx.markdown_pane and bufnr == ctx.markdown_pane.bufnr then
+        return true
+    end
+
+    for _, terminal_ctx in pairs((ctx.markdown_pane and ctx.markdown_pane.terminals) or {}) do
+        if bufnr == terminal_ctx.bufnr then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function non_pane_window(ctx)
+    for _, winid in ipairs(vim.api.nvim_list_wins()) do
+        local config = vim.api.nvim_win_get_config(winid)
+
+        if valid_win(winid) and not is_pane_win(ctx, winid) and (not config.relative or config.relative == "") then
+            return winid
+        end
+    end
+
+    return nil
+end
+
 local function target_window(ctx, bufnr)
     if bufnr then
         for _, winid in ipairs(vim.fn.win_findbuf(bufnr)) do
-            if valid_win(winid) and not (ctx.markdown_pane and winid == ctx.markdown_pane.winid) then
+            if valid_win(winid) and not is_pane_win(ctx, winid) then
                 return winid
             end
         end
     end
 
-    if ctx.is_markdown_pane and ctx.markdown_pane then
+    if ctx.is_pane and ctx.markdown_pane then
         local winid = ctx.markdown_pane.last_focus_win
 
-        if not valid_win(winid) or winid == ctx.markdown_pane.winid then
+        if not valid_win(winid) or is_pane_win(ctx, winid) then
             pcall(vim.cmd, "wincmd p")
             winid = vim.api.nvim_get_current_win()
         end
 
-        if valid_win(winid) and winid ~= ctx.markdown_pane.winid then
+        if valid_win(winid) and not is_pane_win(ctx, winid) then
+            return winid
+        end
+
+        winid = non_pane_window(ctx)
+
+        if valid_win(winid) then
             return winid
         end
     end
@@ -264,8 +327,19 @@ local function target_window(ctx, bufnr)
     return vim.api.nvim_get_current_win()
 end
 
+local function jump_to_line(line)
+    if not line then
+        return
+    end
+
+    local last_line = vim.api.nvim_buf_line_count(0)
+
+    vim.api.nvim_win_set_cursor(0, { math.min(math.max(line, 1), last_line), 0 })
+    vim.cmd("normal! zv")
+end
+
 function M.open()
-    local target = clean_target()
+    local target, line = clean_target()
 
     if not target then
         vim.notify("No file target under cursor", vim.log.levels.WARN)
@@ -286,6 +360,8 @@ function M.open()
             vim.api.nvim_set_current_buf(buffer_match.bufnr)
         end
 
+        jump_to_line(line)
+
         return
     end
 
@@ -303,6 +379,7 @@ function M.open()
     end
 
     vim.cmd.edit(vim.fn.fnameescape(path))
+    jump_to_line(line)
 end
 
 return M

@@ -24,6 +24,8 @@ local M = {
         wrap_toggle_key = "<leader>mw",
         focus_on_switch = true,
         focus_on_ask = true,
+        shutdown_on_exit = true,
+        shutdown_timeout_ms = 300,
         tools = {
             codex = {
                 label = "Codex",
@@ -31,6 +33,7 @@ local M = {
                 include_cd_arg = true,
                 send_delay_ms = 700,
                 switch_command = "/model {model} {effort} {speed}",
+                exit_command = "/quit\r",
                 presets = {
                     {
                         name = "gpt55_high_fast",
@@ -135,6 +138,7 @@ local M = {
                 cmd = "claude",
                 send_delay_ms = 700,
                 switch_command = "/model {model} {effort}",
+                exit_command = "/exit\r",
                 presets = {
                     {
                         name = "sonnet",
@@ -171,11 +175,33 @@ local M = {
                     },
                 },
             },
+            ipython = {
+                label = "IPython",
+                ask = false,
+                cmd = function()
+                    if vim.fn.executable("uv") == 1 then
+                        return { "uv", "run", "ipython" }
+                    end
+
+                    return { "ipython" }
+                end,
+                send_delay_ms = 500,
+                exit_command = "quit()\r",
+                presets = {
+                    {
+                        name = "default",
+                        label = "Default",
+                        args = {},
+                    },
+                },
+            },
         },
     },
 }
 
 local sticky_heading_group = vim.api.nvim_create_augroup("MarkdownPaneStickyHeading", { clear = true })
+local focus_group = vim.api.nvim_create_augroup("MarkdownPaneFocus", { clear = true })
+local shutdown_group = vim.api.nvim_create_augroup("MarkdownPaneShutdown", { clear = true })
 
 local function trim(text)
     return (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -187,6 +213,44 @@ end
 
 local function valid_buf(bufnr)
     return bufnr and vim.api.nvim_buf_is_valid(bufnr)
+end
+
+local function is_pane_buf(bufnr)
+    if not valid_buf(bufnr) then
+        return false
+    end
+
+    if bufnr == M.bufnr then
+        return true
+    end
+
+    for _, ctx in pairs(M.terminals or {}) do
+        if bufnr == ctx.bufnr then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function record_focus_win(winid)
+    winid = winid or vim.api.nvim_get_current_win()
+
+    if not valid_win(winid) or winid == M.winid then
+        return
+    end
+
+    local config = vim.api.nvim_win_get_config(winid)
+
+    if config.relative and config.relative ~= "" then
+        return
+    end
+
+    if is_pane_buf(vim.api.nvim_win_get_buf(winid)) then
+        return
+    end
+
+    M.last_focus_win = winid
 end
 
 local function is_running(job_id)
@@ -207,6 +271,16 @@ local function resolve_path(path)
     return vim.fn.fnamemodify(expanded, ":p")
 end
 
+local function normalize_project_root(root)
+    root = vim.fn.fnamemodify(root or vim.fn.getcwd(), ":p")
+
+    if vim.fn.fnamemodify(root:gsub("/$", ""), ":t") == ".git" then
+        return vim.fn.fnamemodify(root, ":h:h:p")
+    end
+
+    return root
+end
+
 local function project_root(bufnr)
     bufnr = bufnr or vim.api.nvim_get_current_buf()
 
@@ -216,7 +290,7 @@ local function project_root(bufnr)
         ok, root = pcall(vim.fs.root, bufnr, { ".git" })
 
         if ok and root then
-            return vim.fn.fnamemodify(root, ":p")
+            return normalize_project_root(root)
         end
     end
 
@@ -227,11 +301,11 @@ local function project_root(bufnr)
         local found = vim.fs.find(".git", { path = start, upward = true })[1]
 
         if found then
-            return vim.fn.fnamemodify(found, ":p:h")
+            return normalize_project_root(found)
         end
     end
 
-    return vim.fn.fnamemodify(start, ":p")
+    return normalize_project_root(start)
 end
 
 local function project_root_for_path(path)
@@ -245,11 +319,11 @@ local function project_root_for_path(path)
         local found = vim.fs.find(".git", { path = start, upward = true })[1]
 
         if found then
-            return vim.fn.fnamemodify(found, ":p:h")
+            return normalize_project_root(found)
         end
     end
 
-    return vim.fn.fnamemodify(start, ":p")
+    return normalize_project_root(start)
 end
 
 local function relative_path(path, root)
@@ -296,6 +370,11 @@ end
 
 local function command_list(tool, preset, root)
     local cmd = tool.cmd or tool.command
+
+    if type(cmd) == "function" then
+        cmd = cmd(root, preset, tool)
+    end
+
     local result = type(cmd) == "table" and vim.deepcopy(cmd) or { cmd }
 
     if tool.include_cd_arg then
@@ -700,13 +779,32 @@ local function pane_root(bufnr)
 end
 
 setup_pane_maps = function(bufnr)
-    local function map(lhs, rhs, desc)
+    local function map(lhs, rhs, desc, opts)
+        opts = opts or {}
+
         vim.keymap.set("n", lhs, rhs, {
             buffer = bufnr,
             desc = desc,
             silent = true,
+            nowait = opts.nowait,
         })
     end
+
+    map("<space>0", function()
+        M.show_markdown()
+    end, "Show markdown pane", { nowait = true })
+
+    map("<space>x", function()
+        M.open_terminal("codex", nil, { root = pane_root(bufnr), focus = true })
+    end, "Show Codex pane", { nowait = true })
+
+    map("<space>c", function()
+        M.open_terminal("claude", nil, { root = pane_root(bufnr), focus = true })
+    end, "Show Claude pane", { nowait = true })
+
+    map("<space>i", function()
+        M.open_terminal("ipython", nil, { root = pane_root(bufnr), focus = true })
+    end, "Show IPython pane", { nowait = true })
 
     map("<leader>gg", function()
         M.toggle_markdown_agent()
@@ -716,11 +814,15 @@ setup_pane_maps = function(bufnr)
         M.toggle_markdown_agent()
     end, "Toggle markdown/agent pane")
 
-    if bufnr == M.bufnr then
-        map("gf", function()
-            require("smart_gf").open()
-        end, "Smart go to file from markdown pane")
+    map("<leader>gi", function()
+        M.open_terminal("ipython", nil, { root = pane_root(bufnr), focus = true })
+    end, "Show IPython pane")
 
+    map("gf", function()
+        require("smart_gf").open()
+    end, "Smart go to file from pane")
+
+    if bufnr == M.bufnr then
         map(M.config.wrap_toggle_key, function()
             M.toggle_wrap()
         end, "Toggle markdown pane wrap")
@@ -992,6 +1094,24 @@ end
 
 function M.setup(opts)
     M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+
+    vim.api.nvim_clear_autocmds({ group = focus_group })
+    vim.api.nvim_create_autocmd("WinEnter", {
+        group = focus_group,
+        callback = function()
+            record_focus_win()
+        end,
+    })
+
+    vim.api.nvim_clear_autocmds({ group = shutdown_group })
+    vim.api.nvim_create_autocmd("VimLeavePre", {
+        group = shutdown_group,
+        callback = function()
+            if M.config.shutdown_on_exit then
+                M.shutdown_terminals()
+            end
+        end,
+    })
 end
 
 local function preset_by_name(tool, preset_name)
@@ -1015,7 +1135,7 @@ local function ordered_tool_names()
     local names = {}
     local seen = {}
 
-    for _, name in ipairs({ "codex", "claude" }) do
+    for _, name in ipairs({ "codex", "claude", "ipython" }) do
         if tools[name] then
             table.insert(names, name)
             seen[name] = true
@@ -1044,7 +1164,8 @@ local function current_or_default_entry(tool_name, root, key)
     end
 
     local terminal_ctx = root and M.terminals[terminal_key(tool_name, root)] or nil
-    local preset = terminal_ctx and preset_by_name(tool, terminal_ctx.preset_name) or preset_by_name(tool)
+    local running = terminal_ctx and valid_buf(terminal_ctx.bufnr) and is_running(terminal_ctx.job_id)
+    local preset = running and preset_by_name(tool, terminal_ctx.preset_name) or preset_by_name(tool)
 
     return {
         kind = "terminal",
@@ -1053,16 +1174,23 @@ local function current_or_default_entry(tool_name, root, key)
         preset_name = preset.name,
         key = key,
         label = (tool.label or tool_name) .. " current: " .. (preset.label or preset.name or "Default"),
-        running = terminal_ctx and valid_buf(terminal_ctx.bufnr) and is_running(terminal_ctx.job_id),
-        current = terminal_ctx ~= nil,
-        active = terminal_ctx and M.active_terminal_key == terminal_ctx.key,
+        running = running,
+        current = running,
+        active = running and M.active_terminal_key == terminal_ctx.key,
     }
 end
 
-local function tool_shortcut_entries(root)
+local function tool_shortcut_entries(root, opts)
+    opts = opts or {}
+
     local entries = {}
     local codex = current_or_default_entry("codex", root, "x")
     local claude = current_or_default_entry("claude", root, "c")
+    local ipython = nil
+
+    if not opts.ask_only then
+        ipython = current_or_default_entry("ipython", root, "i")
+    end
 
     if codex then
         table.insert(entries, codex)
@@ -1072,24 +1200,32 @@ local function tool_shortcut_entries(root)
         table.insert(entries, claude)
     end
 
+    if ipython then
+        table.insert(entries, ipython)
+    end
+
     return entries
 end
 
-local function terminal_entries(root, start_index)
+local function terminal_entries(root, start_index, opts)
+    opts = opts or {}
+
     local entries = {}
     local index = start_index or 1
 
     for _, tool_name in ipairs(ordered_tool_names()) do
         local tool = M.config.tools[tool_name]
 
-        for _, preset in ipairs(tool.presets or { { name = "default", label = "Default", args = {} } }) do
-            table.insert(entries, {
-                kind = "terminal",
-                tool_name = tool_name,
-                preset_name = preset.name,
-                label = (tool.label or tool_name) .. ": " .. (preset.label or preset.name or "Default"),
-                ordinal = (tool.label or tool_name) .. " " .. (preset.label or preset.name or "Default"),
-            })
+        if (not opts.ask_only or tool.ask ~= false) and not (opts.preset_tools_only and tool.ask == false) then
+            for _, preset in ipairs(tool.presets or { { name = "default", label = "Default", args = {} } }) do
+                table.insert(entries, {
+                    kind = "terminal",
+                    tool_name = tool_name,
+                    preset_name = preset.name,
+                    label = (tool.label or tool_name) .. ": " .. (preset.label or preset.name or "Default"),
+                    ordinal = (tool.label or tool_name) .. " " .. (preset.label or preset.name or "Default"),
+                })
+            end
         end
     end
 
@@ -1102,9 +1238,10 @@ local function terminal_entries(root, start_index)
             local ctx = M.terminals[key]
 
             entry.terminal_key = key
-            entry.running = ctx and valid_buf(ctx.bufnr) and is_running(ctx.job_id)
-            entry.current = entry.running and ctx.preset_name == entry.preset_name
-            entry.active = entry.running and M.active_terminal_key == key
+            entry.session_running = ctx and valid_buf(ctx.bufnr) and is_running(ctx.job_id)
+            entry.current = entry.session_running and ctx.preset_name == entry.preset_name
+            entry.running = entry.current
+            entry.active = entry.current and M.active_terminal_key == key
         end
 
         index = index + 1
@@ -1436,7 +1573,7 @@ function M.switch_picker()
     }
 
     vim.list_extend(entries, tool_shortcut_entries(root))
-    vim.list_extend(entries, terminal_entries(root, 1))
+    vim.list_extend(entries, terminal_entries(root, 1, { preset_tools_only = true }))
 
     numbered_select("Switch pane", entries, function(choice)
         if choice then
@@ -1445,9 +1582,13 @@ function M.switch_picker()
     end)
 end
 
-local function selection_from_visual(bufnr)
-    local start_pos = vim.fn.getpos("'<")
-    local end_pos = vim.fn.getpos("'>")
+local function selection_from_visual(bufnr, opts)
+    opts = opts or {}
+
+    local visual_mode = opts.visual_mode or vim.fn.mode(1)
+    local in_active_visual = visual_mode:match("[vV\22]") ~= nil
+    local start_pos = in_active_visual and vim.fn.getpos("v") or vim.fn.getpos("'<")
+    local end_pos = in_active_visual and vim.fn.getcurpos() or vim.fn.getpos("'>")
 
     local start_lnum = start_pos[2]
     local start_col = start_pos[3]
@@ -1463,7 +1604,13 @@ local function selection_from_visual(bufnr)
         start_col, end_col = end_col, start_col
     end
 
-    local lines = vim.api.nvim_buf_get_text(bufnr, start_lnum - 1, start_col - 1, end_lnum - 1, end_col, {})
+    local lines = nil
+
+    if visual_mode:sub(1, 1) == "V" then
+        lines = vim.api.nvim_buf_get_lines(bufnr, start_lnum - 1, end_lnum, false)
+    else
+        lines = vim.api.nvim_buf_get_text(bufnr, start_lnum - 1, start_col - 1, end_lnum - 1, end_col, {})
+    end
 
     return {
         text = table.concat(lines, "\n"),
@@ -1525,7 +1672,7 @@ local function selection_context(opts)
     opts = opts or {}
 
     local bufnr = opts.bufnr or vim.api.nvim_get_current_buf()
-    local selection = opts.visual and selection_from_visual(bufnr) or selection_from_range(bufnr, opts.line1, opts.line2)
+    local selection = opts.visual and selection_from_visual(bufnr, opts) or selection_from_range(bufnr, opts.line1, opts.line2)
 
     if not selection or selection.text == "" then
         vim.notify("No selection to send", vim.log.levels.WARN)
@@ -1646,6 +1793,141 @@ local function send_prompt_to_terminal(ctx, entry, prompt, started)
         end, prompt_delay)
     else
         send_to_terminal(ctx, prompt, started)
+    end
+end
+
+local function ipython_root(opts)
+    opts = opts or {}
+
+    return opts.root or pane_root(opts.bufnr or vim.api.nvim_get_current_buf())
+end
+
+function M.open_ipython(opts)
+    opts = opts or {}
+
+    return M.open_terminal("ipython", nil, {
+        root = ipython_root(opts),
+        bufnr = opts.bufnr,
+        focus = opts.focus,
+    })
+end
+
+function M.send_ipython(opts)
+    opts = opts or {}
+
+    local context = selection_context(opts)
+
+    if not context then
+        return
+    end
+
+    local ctx, started = M.open_terminal("ipython", nil, {
+        root = context.root,
+        bufnr = context.bufnr,
+        focus = opts.focus == true,
+    })
+
+    if ctx then
+        send_to_terminal(ctx, context.text, started)
+    end
+end
+
+function M.clear_ipython(opts)
+    opts = opts or {}
+
+    local root = ipython_root(opts)
+    local ctx = M.terminals[terminal_key("ipython", root)]
+
+    if not (ctx and valid_buf(ctx.bufnr) and is_running(ctx.job_id)) then
+        vim.notify("No IPython pane running for " .. root_label(root), vim.log.levels.WARN)
+        return
+    end
+
+    vim.fn.chansend(ctx.job_id, "\12")
+end
+
+function M.restart_ipython(opts)
+    opts = opts or {}
+
+    local root = ipython_root(opts)
+    local key = terminal_key("ipython", root)
+    local ctx = M.terminals[key]
+
+    if ctx then
+        if is_running(ctx.job_id) then
+            pcall(vim.fn.jobstop, ctx.job_id)
+        end
+
+        if valid_buf(ctx.bufnr) then
+            pcall(vim.api.nvim_buf_delete, ctx.bufnr, { force = true })
+        end
+
+        M.terminals[key] = nil
+    end
+
+    return M.open_terminal("ipython", nil, {
+        root = root,
+        bufnr = opts.bufnr,
+        focus = opts.focus == nil or opts.focus,
+    })
+end
+
+local function terminal_shutdown_command(ctx)
+    local tool = (M.config.tools or {})[ctx.tool_name]
+
+    if not tool then
+        return nil
+    end
+
+    local command = tool.shutdown_command or tool.exit_command
+
+    if type(command) == "function" then
+        command = command(ctx, tool)
+    end
+
+    return command
+end
+
+local function terminal_shutdown_timeout(ctx, opts)
+    local tool = (M.config.tools or {})[ctx.tool_name] or {}
+
+    return opts.timeout_ms or tool.shutdown_timeout_ms or M.config.shutdown_timeout_ms or 300
+end
+
+local function shutdown_terminal(ctx, opts)
+    opts = opts or {}
+
+    if not (ctx and ctx.job_id and is_running(ctx.job_id)) then
+        return
+    end
+
+    local timeout = terminal_shutdown_timeout(ctx, opts)
+    local command = terminal_shutdown_command(ctx)
+
+    if command and command ~= "" then
+        pcall(vim.fn.chansend, ctx.job_id, command)
+        vim.wait(timeout, function()
+            return not is_running(ctx.job_id)
+        end, 20)
+    end
+
+    if is_running(ctx.job_id) then
+        pcall(vim.fn.jobstop, ctx.job_id)
+        vim.wait(timeout, function()
+            return not is_running(ctx.job_id)
+        end, 20)
+    end
+end
+
+function M.shutdown_terminals(opts)
+    opts = opts or {}
+
+    for key, ctx in pairs(M.terminals or {}) do
+        shutdown_terminal(ctx, opts)
+
+        if not is_running(ctx.job_id) then
+            M.terminals[key] = nil
+        end
     end
 end
 
@@ -1833,6 +2115,7 @@ local function open_question_buffer(entry, context, origin)
         local current_entry = state.entry or entry
         local ctx, started = M.open_terminal(current_entry.tool_name, current_entry.preset_name, {
             bufnr = context.bufnr,
+            root = context.root,
             focus = true,
         })
 
@@ -1860,9 +2143,9 @@ local function open_question_buffer(entry, context, origin)
     M.question_buffers[scratch] = state
 
     local function change_target()
-        local entries = tool_shortcut_entries(context.root)
+        local entries = tool_shortcut_entries(context.root, { ask_only = true })
 
-        vim.list_extend(entries, terminal_entries(context.root, 1))
+        vim.list_extend(entries, terminal_entries(context.root, 1, { ask_only = true }))
 
         numbered_select("Question target", entries, function(choice)
             if choice then
@@ -2006,9 +2289,9 @@ function M.ask_picker(opts)
         return
     end
 
-    local entries = tool_shortcut_entries(context.root)
+    local entries = tool_shortcut_entries(context.root, { ask_only = true })
 
-    vim.list_extend(entries, terminal_entries(context.root, 1))
+    vim.list_extend(entries, terminal_entries(context.root, 1, { ask_only = true }))
 
     numbered_select("Ask", entries, function(choice)
         if choice then

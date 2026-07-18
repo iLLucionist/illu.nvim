@@ -589,6 +589,26 @@ vim.api.nvim_create_user_command("PaneClaude", function(opts)
     markdown_pane.open_terminal("claude", preset)
 end, { nargs = "?" })
 
+vim.api.nvim_create_user_command("PaneIPython", function()
+    markdown_pane.open_ipython({
+        bufnr = vim.api.nvim_get_current_buf(),
+        focus = true,
+    })
+end, {})
+
+vim.api.nvim_create_user_command("PaneIPythonRestart", function()
+    markdown_pane.restart_ipython({
+        bufnr = vim.api.nvim_get_current_buf(),
+        focus = true,
+    })
+end, {})
+
+vim.api.nvim_create_user_command("PaneIPythonClear", function()
+    markdown_pane.clear_ipython({
+        bufnr = vim.api.nvim_get_current_buf(),
+    })
+end, {})
+
 vim.api.nvim_create_user_command("PaneFocus", function()
     markdown_pane.focus_toggle()
 end, {})
@@ -646,6 +666,37 @@ map('n', '<leader>pc', function()
         focus = true,
     })
 end, {})
+map('n', '<leader>pi', function()
+    markdown_pane.open_ipython({
+        bufnr = vim.api.nvim_get_current_buf(),
+        focus = true,
+    })
+end, {})
+map('n', '<leader>pR', function()
+    markdown_pane.restart_ipython({
+        bufnr = vim.api.nvim_get_current_buf(),
+        focus = true,
+    })
+end, {})
+map('n', '<leader>pl', function()
+    markdown_pane.send_ipython({
+        bufnr = vim.api.nvim_get_current_buf(),
+        line1 = vim.fn.line("."),
+        line2 = vim.fn.line("."),
+    })
+end, {})
+map('x', '<leader>pl', function()
+    markdown_pane.send_ipython({
+        bufnr = vim.api.nvim_get_current_buf(),
+        visual = true,
+        visual_mode = vim.fn.mode(1),
+    })
+end, {})
+map('n', '<leader>pX', function()
+    markdown_pane.clear_ipython({
+        bufnr = vim.api.nvim_get_current_buf(),
+    })
+end, {})
 map('n', '<leader>pf', function()
     markdown_pane.focus_toggle()
 end, {})
@@ -659,6 +710,7 @@ map('x', '<leader>pa', function()
     markdown_pane.ask_picker({
         bufnr = vim.api.nvim_get_current_buf(),
         visual = true,
+        visual_mode = vim.fn.mode(1),
     })
 end, {})
 
@@ -855,7 +907,7 @@ glance.setup()
 map('n', '<leader>pr', '<cmd>Glance references<CR>')
 map('n', '<leader>pd', '<cmd>Glance definitions<CR>')
 map('n', '<leader>pt', '<cmd>Glance type_definitions<CR>')
-map('n', '<leader>pi', '<cmd>Glance implementations<CR>')
+map('n', '<leader>pI', '<cmd>Glance implementations<CR>')
 
 require('trouble').setup()
 map('n', '<leader>xx', '<cmd>Trouble diagnostics toggle<cr>')
