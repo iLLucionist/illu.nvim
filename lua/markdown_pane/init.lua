@@ -4,6 +4,7 @@ local heading = require("markdown_pane.heading")
 local maps = require("markdown_pane.maps")
 local picker = require("markdown_pane.picker")
 local question = require("markdown_pane.question")
+local render = require("markdown_pane.render")
 local selection = require("markdown_pane.selection")
 local terminal = require("markdown_pane.terminal")
 local util = require("markdown_pane.util")
@@ -204,6 +205,7 @@ local render_markview
 local setup_pane_maps
 local window_deps
 local viewer_deps
+local render_deps
 
 --- Apply pane-local window options for markdown or terminal mode.
 local function set_window_options(winid, mode)
@@ -212,52 +214,12 @@ end
 
 --- Re-render markview decorations for a markdown buffer.
 render_markview = function(bufnr)
-    local ok, markview = pcall(require, "markview")
-
-    if not ok then
-        return
-    end
-
-    pcall(markview.clear, bufnr)
-    pcall(markview.render, bufnr, { enable = true, hybrid_mode = false })
+    render.markview(bufnr)
 end
 
 --- Reflow the markdown pane buffer using configured internal or external formatting.
 local function reflow_pane_buffer(bufnr, opts)
-    opts = opts or {}
-    bufnr = bufnr or M.bufnr
-
-    if not M.config.auto_reflow or not valid_buf(bufnr) then
-        return
-    end
-
-    local ok, markdown_reflow = pcall(require, "markdown_reflow")
-
-    if not ok then
-        return
-    end
-
-    local readonly = vim.api.nvim_get_option_value("readonly", { buf = bufnr })
-    local modifiable = vim.api.nvim_get_option_value("modifiable", { buf = bufnr })
-
-    vim.api.nvim_set_option_value("readonly", false, { buf = bufnr })
-    vim.api.nvim_set_option_value("modifiable", true, { buf = bufnr })
-    markdown_reflow.reflow_buffer(bufnr, {
-        width = pane_text_width(),
-        force = true,
-        external_reflow_cmd = M.config.external_reflow_cmd,
-        external_reflow_fallback = M.config.external_reflow_fallback,
-        external_reflow_protect_tables = M.config.external_reflow_protect_tables,
-        notify = opts.notify == true,
-    })
-    vim.api.nvim_set_option_value("modified", false, { buf = bufnr })
-    vim.api.nvim_set_option_value("readonly", readonly, { buf = bufnr })
-    vim.api.nvim_set_option_value("modifiable", modifiable, { buf = bufnr })
-end
-
---- Re-apply wrap settings and refresh markdown rendering if needed.
-local function apply_wrap_state()
-    pane_window.apply_wrap_state(M, window_deps())
+    render.reflow_buffer(M, render_deps(), bufnr, opts)
 end
 
 --- Resolve the project root associated with a pane buffer.
@@ -313,10 +275,18 @@ local function ensure_win(bufnr, mode, opts)
     return pane_window.ensure(M, window_deps(), bufnr, mode, opts)
 end
 
+--- Build render module callbacks that still belong to pane/window state.
+render_deps = function()
+    return {
+        preferred_wrap = preferred_wrap,
+        set_window_options = set_window_options,
+        text_width = pane_text_width,
+    }
+end
+
 --- Toggle wrapping in the markdown viewer pane.
 function M.toggle_wrap()
-    M.wrap_enabled = not preferred_wrap()
-    apply_wrap_state()
+    render.toggle_wrap(M, render_deps())
 end
 
 --- Build viewer module callbacks that still belong to pane/window/render state.

@@ -825,6 +825,139 @@ test("external mdfmt reflow preserves markdown tables", function()
     assert(vim.deep_equal(found, table_block), table.concat(output, "\n"))
 end)
 
+test("toggle wrap updates markdown window wrap options", function()
+    reset_pane()
+
+    local root = root_fixture("render-toggle-wrap-test")
+
+    write(root .. "/docs/doc.md", { "# Doc", "", "body" })
+    pane.setup({ wrap = false })
+    pane.open(root .. "/docs/doc.md")
+
+    assert(vim.api.nvim_get_option_value("wrap", { win = pane.winid }) == false, "wrap started enabled")
+
+    pane.toggle_wrap()
+
+    assert(vim.api.nvim_get_option_value("wrap", { win = pane.winid }) == true, "wrap was not enabled")
+    assert(vim.api.nvim_get_option_value("linebreak", { win = pane.winid }) == true, "linebreak was not enabled")
+    assert(vim.api.nvim_get_option_value("breakindent", { win = pane.winid }) == true, "breakindent was not enabled")
+
+    pane.toggle_wrap()
+
+    assert(vim.api.nvim_get_option_value("wrap", { win = pane.winid }) == false, "wrap was not disabled")
+    assert(vim.api.nvim_get_option_value("linebreak", { win = pane.winid }) == false, "linebreak was not disabled")
+    assert(vim.api.nvim_get_option_value("breakindent", { win = pane.winid }) == false, "breakindent was not disabled")
+end)
+
+test("pane reflow preserves readonly modifiable and modified flags", function()
+    reset_pane()
+
+    local root = root_fixture("render-buffer-state-test")
+
+    write(root .. "/docs/doc.md", {
+        "# Doc",
+        "",
+        "This paragraph is intentionally long enough that it can be considered for reflow while testing pane buffer option restoration.",
+    })
+    pane.setup({
+        width = 46,
+        auto_reflow = true,
+    })
+    pane.open(root .. "/docs/doc.md")
+
+    assert(vim.api.nvim_get_option_value("readonly", { buf = pane.bufnr }) == true, "pane buffer readonly was not restored")
+    assert(vim.api.nvim_get_option_value("modifiable", { buf = pane.bufnr }) == false, "pane buffer modifiable was not restored")
+    assert(vim.api.nvim_get_option_value("modified", { buf = pane.bufnr }) == false, "pane buffer was left modified")
+end)
+
+test("pane external reflow command is used", function()
+    reset_pane()
+
+    local root = root_fixture("render-external-used-test")
+
+    write(root .. "/docs/doc.md", {
+        "# Doc",
+        "",
+        "original paragraph that should be replaced by the external formatter",
+    })
+    pane.setup({
+        external_reflow_cmd = { "sh", "-c", "printf '%s\\n' '# External' '' 'external body'" },
+        external_reflow_fallback = false,
+    })
+    pane.open(root .. "/docs/doc.md")
+
+    local output = table.concat(vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false), "\n")
+
+    assert(output:find("# External", 1, true), output)
+    assert(output:find("external body", 1, true), output)
+    assert(not output:find("original paragraph", 1, true), output)
+end)
+
+test("pane external reflow without fallback leaves loaded markdown untouched", function()
+    reset_pane()
+
+    local root = root_fixture("render-external-no-fallback-test")
+    local lines = {
+        "# Doc",
+        "",
+        "this text should survive a failed external formatter when fallback is disabled",
+    }
+
+    write(root .. "/docs/doc.md", lines)
+    pane.setup({
+        external_reflow_cmd = { "sh", "-c", "exit 7" },
+        external_reflow_fallback = false,
+    })
+    pane.open(root .. "/docs/doc.md")
+
+    assert(vim.deep_equal(vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false), lines), "failed external reflow mutated markdown")
+end)
+
+test("pane mdfmt reflow preserves markdown tables", function()
+    if vim.fn.executable("mdfmt") ~= 1 then
+        return
+    end
+
+    reset_pane()
+
+    local root = root_fixture("render-pane-table-test")
+    local table_block = {
+        "| Name | Value |",
+        "| ---- | ----- |",
+        "| alpha | one two three |",
+        "| beta | four five six |",
+    }
+
+    write(root .. "/docs/doc.md", {
+        "# Doc",
+        "",
+        "This paragraph is intentionally long enough that mdfmt should wrap it when the pane opens with a narrow configured width.",
+        "",
+        table_block[1],
+        table_block[2],
+        table_block[3],
+        table_block[4],
+    })
+    pane.setup({
+        width = 48,
+        external_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" },
+        external_reflow_protect_tables = true,
+        external_reflow_fallback = false,
+    })
+    pane.open(root .. "/docs/doc.md")
+
+    local output = vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false)
+    local found = {}
+
+    for _, line in ipairs(output) do
+        if line:find("^|") then
+            table.insert(found, line)
+        end
+    end
+
+    assert(vim.deep_equal(found, table_block), table.concat(output, "\n"))
+end)
+
 test("smart gf from IPython pane opens traceback file and line outside pane", function()
     reset_pane()
 
