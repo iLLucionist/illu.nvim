@@ -1,10 +1,12 @@
 vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
 local defaults = require("sidepanes.defaults")
+local commands = require("sidepanes.commands")
 local config = require("sidepanes.config")
 local pane_context = require("sidepanes.context")
 local document_picker = require("sidepanes.document_picker")
 local entries = require("sidepanes.entries")
+local global_maps = require("sidepanes.global_maps")
 local presets = require("sidepanes.presets")
 local util = require("sidepanes.util")
 local markdown_reflow = require("markdown_reflow")
@@ -49,6 +51,15 @@ local function call_map(bufnr, lhs)
 
     assert(map.callback, lhs .. " has no callback")
     map.callback()
+end
+
+local function global_map(lhs, mode)
+    local found = vim.fn.maparg(lhs, mode or "n", false, true)
+
+    assert(found and found.lhs ~= "", "missing global map: " .. lhs)
+    assert(found.callback, lhs .. " has no callback")
+
+    return found
 end
 
 local function only_question_buf()
@@ -180,6 +191,204 @@ test("setup installs single focus and shutdown autocmds when repeated", function
     assert(pane.config.width == 61, "setup lost earlier config merge")
     assert(pane.config.wrap == true, "setup did not merge later config")
     assert(pane.config.tools.codex ~= nil, "setup dropped default tools")
+end)
+
+test("command registration invokes facade callbacks", function()
+    local calls = {}
+    local bufnr = vim.api.nvim_get_current_buf()
+
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, { "1", "2", "3", "4", "5", "6", "7" })
+
+    commands.setup({
+        toggle = function(path)
+            calls.toggle = path
+        end,
+        pick = function()
+            calls.pick = true
+        end,
+        switch_picker = function()
+            calls.switch = true
+        end,
+        open_terminal = function(tool_name, preset_name)
+            calls.open_terminal = { tool_name = tool_name, preset_name = preset_name }
+        end,
+        open_ipython = function(opts)
+            calls.open_ipython = opts
+        end,
+        restart_ipython = function(opts)
+            calls.restart_ipython = opts
+        end,
+        clear_ipython = function(opts)
+            calls.clear_ipython = opts
+        end,
+        focus_toggle = function()
+            calls.focus = true
+        end,
+        toggle_zoom = function()
+            calls.zoom = true
+        end,
+        ask_picker = function(opts)
+            calls.ask = opts
+        end,
+        ask = function(tool_name, preset_name, opts)
+            calls.ask_tool = { tool_name = tool_name, preset_name = preset_name, opts = opts }
+        end,
+    }, {
+        toggle = "SidepanesTestToggle",
+        pick = "SidepanesTestPick",
+        switch = "SidepanesTestSwitch",
+        tool = "SidepanesTestTool",
+        codex = "SidepanesTestCodex",
+        claude = "SidepanesTestClaude",
+        ipython = "SidepanesTestIPython",
+        ipython_restart = "SidepanesTestIPythonRestart",
+        ipython_clear = "SidepanesTestIPythonClear",
+        focus = "SidepanesTestFocus",
+        zoom = "SidepanesTestZoom",
+        ask = "SidepanesTestAsk",
+        ask_codex = "SidepanesTestAskCodex",
+        ask_claude = "SidepanesTestAskClaude",
+    })
+
+    vim.cmd("SidepanesTestToggle docs/demo.md")
+    assert(calls.toggle == "docs/demo.md", "toggle command did not forward optional path")
+    vim.cmd("SidepanesTestPick")
+    assert(calls.pick == true, "pick command did not call pick")
+    vim.cmd("SidepanesTestSwitch")
+    assert(calls.switch == true, "switch command did not call switch picker")
+    vim.cmd("SidepanesTestTool codex review")
+    assert(calls.open_terminal.tool_name == "codex", "tool command did not forward tool")
+    assert(calls.open_terminal.preset_name == "review", "tool command did not forward preset")
+    vim.cmd("SidepanesTestCodex gpt55_high_fast")
+    assert(calls.open_terminal.tool_name == "codex", "codex command did not open codex")
+    assert(calls.open_terminal.preset_name == "gpt55_high_fast", "codex command did not forward preset")
+    vim.cmd("SidepanesTestClaude sonnet")
+    assert(calls.open_terminal.tool_name == "claude", "claude command did not open claude")
+    assert(calls.open_terminal.preset_name == "sonnet", "claude command did not forward preset")
+    vim.cmd("SidepanesTestIPython")
+    assert(calls.open_ipython.bufnr == bufnr and calls.open_ipython.focus == true, "ipython command did not use current buffer")
+    vim.cmd("SidepanesTestIPythonRestart")
+    assert(calls.restart_ipython.bufnr == bufnr and calls.restart_ipython.focus == true, "ipython restart command did not use current buffer")
+    vim.cmd("SidepanesTestIPythonClear")
+    assert(calls.clear_ipython.bufnr == bufnr, "ipython clear command did not use current buffer")
+    vim.cmd("SidepanesTestFocus")
+    assert(calls.focus == true, "focus command did not call focus toggle")
+    vim.cmd("SidepanesTestZoom")
+    assert(calls.zoom == true, "zoom command did not call zoom toggle")
+    vim.cmd("2,4SidepanesTestAsk")
+    assert(calls.ask.bufnr == bufnr and calls.ask.line1 == 2 and calls.ask.line2 == 4, "ask command did not forward range")
+    vim.cmd("3,5SidepanesTestAskCodex gpt55_high_fast")
+    assert(calls.ask_tool.tool_name == "codex", "ask codex command used wrong tool")
+    assert(calls.ask_tool.preset_name == "gpt55_high_fast", "ask codex command did not forward preset")
+    assert(calls.ask_tool.opts.line1 == 3 and calls.ask_tool.opts.line2 == 5, "ask codex command did not forward range")
+    vim.cmd("6,7SidepanesTestAskClaude sonnet")
+    assert(calls.ask_tool.tool_name == "claude", "ask claude command used wrong tool")
+    assert(calls.ask_tool.preset_name == "sonnet", "ask claude command did not forward preset")
+    assert(calls.ask_tool.opts.line1 == 6 and calls.ask_tool.opts.line2 == 7, "ask claude command did not forward range")
+end)
+
+test("global map registration invokes facade callbacks", function()
+    local calls = {}
+    local bufnr = vim.api.nvim_get_current_buf()
+
+    vim.api.nvim_win_set_cursor(0, { 1, 0 })
+
+    global_maps.setup({
+        toggle = function()
+            calls.toggle = true
+        end,
+        pick = function()
+            calls.pick = true
+        end,
+        show_markdown = function()
+            calls.markdown = true
+        end,
+        open_terminal = function(tool_name, preset_name, opts)
+            calls.open_terminal = { tool_name = tool_name, preset_name = preset_name, opts = opts }
+        end,
+        open_ipython = function(opts)
+            calls.open_ipython = opts
+        end,
+        restart_ipython = function(opts)
+            calls.restart_ipython = opts
+        end,
+        send_ipython = function(opts)
+            calls.send_ipython = opts
+        end,
+        clear_ipython = function(opts)
+            calls.clear_ipython = opts
+        end,
+        focus_toggle = function()
+            calls.focus = true
+        end,
+        toggle_zoom = function()
+            calls.zoom = true
+        end,
+        switch_picker = function()
+            calls.switch = true
+        end,
+        ask_picker = function(opts)
+            calls.ask = opts
+        end,
+        ask_last_coding_agent = function(opts)
+            calls.ask_last = opts
+        end,
+        ask_current_coding_agent = function(tool_name, opts)
+            calls.ask_current = { tool_name = tool_name, opts = opts }
+        end,
+    }, {
+        toggle = "<leader>zt",
+        pick = "<leader>zk",
+        markdown = "<leader>z0",
+        codex = "<leader>zx",
+        claude = "<leader>zc",
+        ipython = "<leader>zi",
+        restart_ipython = "<leader>zR",
+        send_ipython = "<leader>zl",
+        clear_ipython = "<leader>zX",
+        focus = "<leader>zf",
+        zoom = "<leader>zz",
+        switch = "<leader>zs",
+        ask = "<leader>za",
+        ask_last = "zA",
+        ask_codex = "zX",
+        ask_claude = "zC",
+    })
+
+    global_map("<leader>zt").callback()
+    assert(calls.toggle == true, "toggle map did not call toggle")
+    global_map("<leader>zk").callback()
+    assert(calls.pick == true, "pick map did not call pick")
+    global_map("<leader>z0").callback()
+    assert(calls.markdown == true, "markdown map did not call show_markdown")
+    global_map("<leader>zx").callback()
+    assert(calls.open_terminal.tool_name == "codex" and calls.open_terminal.opts.bufnr == bufnr, "codex map did not open codex for current buffer")
+    global_map("<leader>zc").callback()
+    assert(calls.open_terminal.tool_name == "claude" and calls.open_terminal.opts.focus == true, "claude map did not focus terminal")
+    global_map("<leader>zi").callback()
+    assert(calls.open_ipython.bufnr == bufnr and calls.open_ipython.focus == true, "ipython map did not use current buffer")
+    global_map("<leader>zR").callback()
+    assert(calls.restart_ipython.bufnr == bufnr and calls.restart_ipython.focus == true, "ipython restart map did not use current buffer")
+    global_map("<leader>zl").callback()
+    assert(calls.send_ipython.bufnr == bufnr and calls.send_ipython.line1 == 1 and calls.send_ipython.line2 == 1, "normal send map did not send current line")
+    global_map("<leader>zl", "x").callback()
+    assert(calls.send_ipython.bufnr == bufnr and calls.send_ipython.visual == true, "visual send map did not send visual selection")
+    global_map("<leader>zX").callback()
+    assert(calls.clear_ipython.bufnr == bufnr, "clear map did not use current buffer")
+    global_map("<leader>zf").callback()
+    assert(calls.focus == true, "focus map did not call focus toggle")
+    global_map("<leader>zz").callback()
+    assert(calls.zoom == true, "zoom map did not call zoom toggle")
+    global_map("<leader>zs").callback()
+    assert(calls.switch == true, "switch map did not call switch picker")
+    global_map("<leader>za", "x").callback()
+    assert(calls.ask.bufnr == bufnr and calls.ask.visual == true, "ask map did not use visual opts")
+    global_map("zA", "x").callback()
+    assert(calls.ask_last.bufnr == bufnr and calls.ask_last.visual == true, "ask-last map did not use visual opts")
+    global_map("zX", "x").callback()
+    assert(calls.ask_current.tool_name == "codex", "ask-codex map used wrong tool")
+    global_map("zC", "x").callback()
+    assert(calls.ask_current.tool_name == "claude", "ask-claude map used wrong tool")
 end)
 
 test("codex preset generator matches the default preset table", function()

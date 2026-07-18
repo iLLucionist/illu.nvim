@@ -554,186 +554,28 @@ local markdown_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap"
 sidepanes.setup({
     external_reflow_cmd = markdown_reflow_cmd,
     external_reflow_protect_tables = true,
+    commands = true,
+    mappings = {
+        global = {
+            toggle = "<leader>pp",
+            pick = "<leader>mP",
+            markdown = "<leader>p0",
+            codex = "<leader>px",
+            claude = "<leader>pc",
+            ipython = "<leader>pi",
+            restart_ipython = "<leader>pR",
+            send_ipython = "<leader>pl",
+            clear_ipython = "<leader>pX",
+            focus = "<leader>pf",
+            zoom = "<leader>pz",
+            switch = "<leader>ps",
+            ask = "<leader>pa",
+            ask_last = "aa",
+            ask_codex = "ax",
+            ask_claude = "ac",
+        },
+    },
 })
-
-vim.api.nvim_create_user_command("SidepanesToggle", function(opts)
-    sidepanes.toggle(opts.args)
-end, { nargs = "?", complete = "file" })
-
-vim.api.nvim_create_user_command("SidepanesPick", function()
-    sidepanes.pick()
-end, {})
-
-vim.api.nvim_create_user_command("PaneSwitch", function()
-    sidepanes.switch_picker()
-end, {})
-
-vim.api.nvim_create_user_command("PaneTool", function(opts)
-    local parts = vim.split(opts.args or "", "%s+", { trimempty = true })
-
-    if not parts[1] then
-        sidepanes.switch_picker()
-        return
-    end
-
-    sidepanes.open_terminal(parts[1], parts[2])
-end, { nargs = "*" })
-
-vim.api.nvim_create_user_command("PaneCodex", function(opts)
-    local preset = opts.args ~= "" and opts.args or nil
-    sidepanes.open_terminal("codex", preset)
-end, { nargs = "?" })
-
-vim.api.nvim_create_user_command("PaneClaude", function(opts)
-    local preset = opts.args ~= "" and opts.args or nil
-    sidepanes.open_terminal("claude", preset)
-end, { nargs = "?" })
-
-vim.api.nvim_create_user_command("PaneIPython", function()
-    sidepanes.open_ipython({
-        bufnr = vim.api.nvim_get_current_buf(),
-        focus = true,
-    })
-end, {})
-
-vim.api.nvim_create_user_command("PaneIPythonRestart", function()
-    sidepanes.restart_ipython({
-        bufnr = vim.api.nvim_get_current_buf(),
-        focus = true,
-    })
-end, {})
-
-vim.api.nvim_create_user_command("PaneIPythonClear", function()
-    sidepanes.clear_ipython({
-        bufnr = vim.api.nvim_get_current_buf(),
-    })
-end, {})
-
-vim.api.nvim_create_user_command("PaneFocus", function()
-    sidepanes.focus_toggle()
-end, {})
-
-vim.api.nvim_create_user_command("PaneZoom", function()
-    sidepanes.toggle_zoom()
-end, {})
-
-vim.api.nvim_create_user_command("PaneAsk", function(opts)
-    sidepanes.ask_picker({
-        bufnr = vim.api.nvim_get_current_buf(),
-        line1 = opts.line1,
-        line2 = opts.line2,
-    })
-end, { range = true })
-
-vim.api.nvim_create_user_command("PaneAskCodex", function(opts)
-    local preset = opts.args ~= "" and opts.args or nil
-
-    sidepanes.ask("codex", preset, {
-        bufnr = vim.api.nvim_get_current_buf(),
-        line1 = opts.line1,
-        line2 = opts.line2,
-    })
-end, { nargs = "?", range = true })
-
-vim.api.nvim_create_user_command("PaneAskClaude", function(opts)
-    local preset = opts.args ~= "" and opts.args or nil
-
-    sidepanes.ask("claude", preset, {
-        bufnr = vim.api.nvim_get_current_buf(),
-        line1 = opts.line1,
-        line2 = opts.line2,
-    })
-end, { nargs = "?", range = true })
-
-map('n', '<leader>pp', function()
-    sidepanes.toggle()
-end, {})
-map('n', '<leader>mP', function()
-    sidepanes.pick()
-end, {})
-map('n', '<leader>p0', function()
-    sidepanes.show_markdown()
-end, {})
-map('n', '<leader>px', function()
-    sidepanes.open_terminal("codex", nil, {
-        bufnr = vim.api.nvim_get_current_buf(),
-        focus = true,
-    })
-end, {})
-map('n', '<leader>pc', function()
-    sidepanes.open_terminal("claude", nil, {
-        bufnr = vim.api.nvim_get_current_buf(),
-        focus = true,
-    })
-end, {})
-map('n', '<leader>pi', function()
-    sidepanes.open_ipython({
-        bufnr = vim.api.nvim_get_current_buf(),
-        focus = true,
-    })
-end, {})
-map('n', '<leader>pR', function()
-    sidepanes.restart_ipython({
-        bufnr = vim.api.nvim_get_current_buf(),
-        focus = true,
-    })
-end, {})
-map('n', '<leader>pl', function()
-    sidepanes.send_ipython({
-        bufnr = vim.api.nvim_get_current_buf(),
-        line1 = vim.fn.line("."),
-        line2 = vim.fn.line("."),
-    })
-end, {})
-map('x', '<leader>pl', function()
-    sidepanes.send_ipython({
-        bufnr = vim.api.nvim_get_current_buf(),
-        visual = true,
-        visual_mode = vim.fn.mode(1),
-    })
-end, {})
-map('n', '<leader>pX', function()
-    sidepanes.clear_ipython({
-        bufnr = vim.api.nvim_get_current_buf(),
-    })
-end, {})
-map('n', '<leader>pf', function()
-    sidepanes.focus_toggle()
-end, {})
-map('n', '<leader>pz', function()
-    sidepanes.toggle_zoom()
-end, {})
-map('n', '<leader>ps', function()
-    sidepanes.switch_picker()
-end, {})
-map('x', '<leader>pa', function()
-    sidepanes.ask_picker({
-        bufnr = vim.api.nvim_get_current_buf(),
-        visual = true,
-        visual_mode = vim.fn.mode(1),
-    })
-end, {})
-map('x', 'aa', function()
-    sidepanes.ask_last_coding_agent({
-        bufnr = vim.api.nvim_get_current_buf(),
-        visual = true,
-        visual_mode = vim.fn.mode(1),
-    })
-end, { desc = "Ask last coding agent" })
-map('x', 'ax', function()
-    sidepanes.ask_current_coding_agent("codex", {
-        bufnr = vim.api.nvim_get_current_buf(),
-        visual = true,
-        visual_mode = vim.fn.mode(1),
-    })
-end, { desc = "Ask current Codex pane" })
-map('x', 'ac', function()
-    sidepanes.ask_current_coding_agent("claude", {
-        bufnr = vim.api.nvim_get_current_buf(),
-        visual = true,
-        visual_mode = vim.fn.mode(1),
-    })
-end, { desc = "Ask current Claude pane" })
 
 local markdown_reflow = require("markdown_reflow")
 

@@ -1,7 +1,7 @@
 --[[
 sidepanes.defaults
 Purpose: Define the plugin's built-in configuration.
-Does: Provides pane layout defaults, reflow behavior, lifecycle settings, and the configured Codex, Claude, and IPython tool presets.
+Does: Provides pane layout defaults, reflow behavior, command/mapping toggles, lifecycle settings, and configured tool presets.
 Architecture: Supplies the initial config table consumed by init.lua and later merged with user overrides during lifecycle setup.
 ]]
 
@@ -22,6 +22,10 @@ M.config = {
     focus_on_ask = true,
     shutdown_on_exit = true,
     shutdown_timeout_ms = 300,
+    commands = false,
+    mappings = {
+        global = false,
+    },
     tools = {
         codex = {
             label = "Codex",

@@ -1,7 +1,7 @@
 --[[
 sidepanes.init
 Purpose: Expose the public API and shared state for the sidepanes plugin.
-Does: Wires together viewer, window, render, switcher, terminal, question, lifecycle, and picker modules through dependency callbacks.
+Does: Wires together viewer, window, render, switcher, terminal, question, commands, lifecycle, mappings, and picker modules.
 Architecture: Acts as the facade module required by user config; substantial behavior lives in focused submodules to keep responsibilities separated.
 ]]
 
@@ -11,9 +11,11 @@ Architecture: Acts as the facade module required by user config; substantial beh
 
 
 local defaults = require("sidepanes.defaults")
+local commands = require("sidepanes.commands")
 local context = require("sidepanes.context")
 local document_picker = require("sidepanes.document_picker")
 local entries = require("sidepanes.entries")
+local global_maps = require("sidepanes.global_maps")
 local heading = require("sidepanes.heading")
 local lifecycle = require("sidepanes.lifecycle")
 local maps = require("sidepanes.maps")
@@ -354,6 +356,8 @@ function M.setup(opts)
         record_focus_win = record_focus_win,
         shutdown_terminals = M.shutdown_terminals,
     }, opts)
+    commands.setup(M, M.config.commands)
+    global_maps.setup(M, M.config.mappings and M.config.mappings.global)
 end
 
 

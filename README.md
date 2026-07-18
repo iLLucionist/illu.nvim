@@ -26,7 +26,23 @@ require("sidepanes").setup({
       enabled = false,
     },
   },
+  commands = true,
+  mappings = {
+    global = {
+      toggle = "<leader>pp",
+      markdown = "<leader>p0",
+      codex = "<leader>px",
+      claude = "<leader>pc",
+      ipython = "<leader>pi",
+      focus = "<leader>pf",
+      zoom = "<leader>pz",
+      send_ipython = "<leader>pl",
+      ask = "<leader>pa",
+    },
+  },
 })
 ```
 
 For reusable generated tool tables, use `require("sidepanes.presets").codex(...)` or `require("sidepanes.presets").claude(...)`.
+
+Set `commands = true` to register the default `:Sidepanes*` and `:Pane*` commands. Set `mappings.global` to a table to install global mappings; pane-local mappings remain managed separately inside sidepanes buffers.
