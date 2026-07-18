@@ -5,7 +5,9 @@ Does: Verifies configured commands, forbidden legacy commands, global mappings, 
 Architecture: Complements the focused regression suite with a full-config smoke test that catches wiring regressions.
 ]]
 
-vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
+local plugin_root = "/Users/maximl/.config/nvim/illu.nvim"
+
+vim.opt.runtimepath:append(plugin_root)
 
 local sidepanes = require("sidepanes")
 
@@ -22,6 +24,18 @@ local function assert_global_map(mode, lhs)
 
     assert(map and map.lhs and map.lhs ~= "", "missing global map " .. lhs .. " in " .. mode)
     assert(map.callback, "global map has no callback " .. lhs .. " in " .. mode)
+end
+
+local function assert_module_comment(path)
+    local name = vim.fn.fnamemodify(path, ":t:r")
+    local lines = vim.fn.readfile(path, "", 8)
+    local header = table.concat(lines, "\n")
+
+    assert(lines[1] == "--[[", "missing top-level block comment: " .. path)
+    assert(header:find("sidepanes%." .. name), "module comment does not name module: " .. path)
+    assert(header:find("Purpose:"), "module comment missing Purpose: " .. path)
+    assert(header:find("Does:"), "module comment missing Does: " .. path)
+    assert(header:find("Architecture:"), "module comment missing Architecture: " .. path)
 end
 
 local function capture_health(fn)
@@ -140,6 +154,10 @@ end
 
 for _, item in ipairs(expected_maps) do
     assert_global_map(item[1], item[2])
+end
+
+for _, path in ipairs(vim.fn.globpath(plugin_root .. "/lua/sidepanes", "*.lua", false, true)) do
+    assert_module_comment(path)
 end
 
 local pane_config = sidepanes.get_config()

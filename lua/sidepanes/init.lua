@@ -26,9 +26,9 @@ local question = require("sidepanes.question")
 local render = require("sidepanes.render")
 local switcher = require("sidepanes.switcher")
 local terminal = require("sidepanes.terminal")
-local util = require("sidepanes.util")
 local pane_window = require("sidepanes.window")
 local viewer = require("sidepanes.viewer")
+local width = require("sidepanes.width")
 local winbar = require("sidepanes.winbar")
 
 
@@ -73,7 +73,6 @@ local resize_group = vim.api.nvim_create_augroup("SidepanesResize", { clear = tr
 -- =============================================================================
 
 
-local valid_win = util.valid_win
 local statusline_escape = heading.statusline_escape
 
 
@@ -350,178 +349,52 @@ function M.text_width()
     return pane_text_width()
 end
 
---- Return the effective normal pane width in columns.
-function M.get_width()
-    return pane_window.width(M)
+--- Build width module callbacks that still belong to pane/window/render state.
+local function width_deps()
+    return {
+        numbered_select = numbered_select,
+        reflow_pane_buffer = reflow_pane_buffer,
+        render_markview = render_markview,
+        restore_markdown_view = restore_markdown_view,
+        save_markdown_view = save_markdown_view,
+        set_window_options = set_window_options,
+        update_sticky_heading = update_sticky_heading,
+    }
 end
 
---- Apply a resolved normal pane width and refresh markdown layout if needed.
-local function apply_width(width, opts)
-    opts = opts or {}
-    M.config.width = width
-
-    if opts.relative_width and M.config.sticky_relative_width then
-        M.relative_width = opts.relative_width
-    elseif not opts.preserve_relative_width then
-        M.relative_width = nil
-    end
-
-    if not valid_win(M.winid) then
-        return width
-    end
-
-    if M.active_mode == "markdown" then
-        save_markdown_view()
-    end
-
-    pcall(vim.api.nvim_win_set_width, M.winid, pane_window.width(M))
-    set_window_options(M.winid, M.active_mode == "markdown" and "markdown" or "terminal")
-
-    if M.active_mode == "markdown" and util.valid_buf(M.bufnr) then
-        reflow_pane_buffer(M.bufnr)
-        render_markview(M.bufnr)
-        restore_markdown_view()
-    end
-
-    update_sticky_heading()
-
-    return width
+--- Return the effective normal pane width in columns.
+function M.get_width()
+    return width.get(M)
 end
 
 --- Set the normal pane width from columns, a percentage, or a screen fraction.
 function M.set_width(value)
-    local width, err, relative_width = api_helpers.resolve_width(value, M.config.width)
-
-    if not width then
-        vim.notify(err, vim.log.levels.ERROR)
-        return nil
-    end
-
-    return apply_width(width, { relative_width = relative_width })
+    return width.set(M, width_deps(), value)
 end
 
 --- Adjust the normal pane width by a column delta.
 function M.adjust_width(delta)
-    local width, err = api_helpers.resolve_width_delta(delta, M.config.width)
-
-    if not width then
-        vim.notify(err, vim.log.levels.ERROR)
-        return nil
-    end
-
-    return apply_width(width)
-end
-
---- Return display text for a resolved width boundary.
-local function width_boundary_label(boundary)
-    if not boundary then
-        return "none"
-    end
-
-    return tostring(boundary.label or boundary.value or boundary.width) .. " (" .. tostring(boundary.width) .. " cols)"
-end
-
---- Notify the user where width snapping landed and nearby snap points.
-local function notify_width_snap(width, point)
-    local context = api_helpers.width_boundary_context(width, M.config.width_snap_points)
-    local current = point and tostring(point) or (context.current and context.current.label) or tostring(width)
-
-    vim.notify(
-        "Sidepanes width: "
-            .. tostring(current)
-            .. " ("
-            .. tostring(width)
-            .. " cols); previous "
-            .. width_boundary_label(context.previous)
-            .. "; next "
-            .. width_boundary_label(context.next),
-        vim.log.levels.INFO
-    )
+    return width.adjust(M, width_deps(), delta)
 end
 
 --- Move the normal pane width to the next or previous configured snap point.
 function M.snap_width(direction)
-    local current_width = pane_window.width(M)
-    local width, err, relative_width, point = api_helpers.resolve_width_snap(current_width, direction, M.config.width_snap_points)
-
-    if not width then
-        vim.notify(err, vim.log.levels.ERROR)
-        return nil
-    end
-
-    if width == current_width and not relative_width then
-        notify_width_snap(width, point)
-        return width
-    end
-
-    local applied = apply_width(width, { relative_width = relative_width })
-
-    notify_width_snap(applied, point)
-
-    return applied
-end
-
---- Build picker entries for configured common width points.
-local function width_picker_entries()
-    local entries = {}
-    local current_width = pane_window.width(M)
-
-    for index, boundary in ipairs(api_helpers.width_boundaries(M.config.width_picker_points or M.config.width_snap_points, current_width)) do
-        table.insert(entries, {
-            index = index,
-            key = tostring(index),
-            value = boundary.value,
-            width = boundary.width,
-            relative_width = boundary.relative_width,
-            current = boundary.width == current_width,
-            label = tostring(boundary.label) .. "  (" .. tostring(boundary.width) .. " cols)",
-        })
-    end
-
-    return entries
+    return width.snap(M, width_deps(), direction)
 end
 
 --- Show a picker for common pane width snap points.
 function M.width_picker()
-    numbered_select("Sidepanes width", width_picker_entries(), function(choice)
-        if not choice then
-            return
-        end
-
-        local applied = apply_width(choice.width, { relative_width = choice.relative_width })
-
-        notify_width_snap(applied, choice.value)
-    end)
+    return width.picker(M, width_deps())
 end
 
 --- Toggle whether relative pane widths stay tied to total Neovim columns.
 function M.toggle_sticky_relative_width(enabled)
-    if enabled == nil then
-        enabled = not M.config.sticky_relative_width
-    else
-        enabled = enabled == true
-    end
-
-    M.config.sticky_relative_width = enabled
-
-    if enabled then
-        M.relative_width = api_helpers.relative_width_spec(M.config.width / vim.o.columns, "current")
-    else
-        M.relative_width = nil
-    end
-
-    vim.notify("Sidepanes sticky relative width " .. (enabled and "on" or "off"), vim.log.levels.INFO)
-
-    return enabled
+    return width.toggle_sticky_relative(M, enabled)
 end
 
 --- Recompute sticky relative width after Neovim columns change.
 function M.refresh_width()
-    if not M.config.sticky_relative_width or not M.relative_width then
-        return nil
-    end
-
-    return apply_width(pane_window.width(M), { preserve_relative_width = true })
+    return width.refresh(M, width_deps())
 end
 
 

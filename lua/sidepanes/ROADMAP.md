@@ -35,6 +35,8 @@ Recently completed or in progress:
 - Width snapping reports the current, previous, and next snap points after use.
 - `width_picker()` / `<leader>pw` / `:SidepanesWidthPick` pick from configurable common width points.
 - Width command aliases cover next, previous, prev, +, -, and pick through both `:SidepanesWidth` and `:Sidepanes width`.
+- Runtime width behavior lives in `lua/sidepanes/width.lua`; `init.lua` delegates width API calls through thin wrappers.
+- The audit smoke test enforces top-level Purpose/Does/Architecture comments for all `lua/sidepanes/*.lua` modules.
 
 ## Roadmap
 
@@ -107,6 +109,7 @@ Completed decisions:
 - Use `<leader>pw`, `:SidepanesWidthPick`, and `:Sidepanes width-pick` for explicit width picking.
 - Support readable command aliases through `:Sidepanes width next`, `:Sidepanes width previous`, `:Sidepanes width prev`, `:Sidepanes width +`, `:Sidepanes width -`, and `:Sidepanes width pick`.
 - Support the same aliases through the standalone `:SidepanesWidth` command.
+- Keep width runtime behavior in `lua/sidepanes/width.lua` rather than growing `init.lua` again.
 
 ### 4. Docs Split
 
@@ -132,7 +135,7 @@ Possible work:
 
 - Add `doc/sidepanes.txt`.
 - Generate helptags-compatible sections.
-- Keep module top-level comments consistent.
+- Keep module top-level comments consistent; the audit smoke test now enforces Purpose/Does/Architecture headers.
 - Confirm no personal config assumptions leak into plugin modules.
 - Keep personal `init.lua` as a consumer of the public setup/config surface.
 
