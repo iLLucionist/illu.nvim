@@ -1,3 +1,10 @@
+--[[
+markdown_pane.terminal
+Purpose: Own pane-managed terminal sessions for tools and IPython.
+Does: Starts/reuses terminal jobs by project root, tracks active sessions and presets, sends prompts/code, switches models, and shuts jobs down.
+Architecture: Implements terminal behavior behind the init.lua facade, using entries/util helpers and injected window/selection callbacks.
+]]
+
 local entries = require("markdown_pane.entries")
 local util = require("markdown_pane.util")
 

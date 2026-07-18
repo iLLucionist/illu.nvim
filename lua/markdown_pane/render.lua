@@ -1,3 +1,10 @@
+--[[
+markdown_pane.render
+Purpose: Handle markdown rendering refreshes and automatic reflow.
+Does: Re-runs markview rendering, invokes internal or external markdown reflow, and updates wrap state.
+Architecture: Encapsulates buffer formatting/render side effects behind dependency callbacks for pane width and window options.
+]]
+
 local util = require("markdown_pane.util")
 
 local M = {}

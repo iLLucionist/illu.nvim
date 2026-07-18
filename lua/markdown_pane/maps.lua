@@ -1,3 +1,10 @@
+--[[
+markdown_pane.maps
+Purpose: Install pane-local keymaps for markdown and terminal pane buffers.
+Does: Binds quick pane switching, smart gf, ask mappings, and markdown wrap toggling with buffer-local scope.
+Architecture: Receives behavior through dependency callbacks from init.lua so mappings stay declarative and do not own plugin state.
+]]
+
 local M = {}
 
 --- Install one buffer-local pane mapping.

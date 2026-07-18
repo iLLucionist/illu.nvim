@@ -1,3 +1,10 @@
+--[[
+markdown_pane.winbar
+Purpose: Maintain the pane winbar title for markdown and terminal modes.
+Does: Shows the active markdown heading or terminal identity, includes zoom state, truncates labels, and refreshes on movement/resize events.
+Architecture: Bridges heading.lua formatting with shared pane state; init.lua installs its autocmd group through this module.
+]]
+
 local heading = require("markdown_pane.heading")
 local util = require("markdown_pane.util")
 

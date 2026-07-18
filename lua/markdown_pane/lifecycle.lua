@@ -1,3 +1,10 @@
+--[[
+markdown_pane.lifecycle
+Purpose: Manage plugin setup-time configuration and global lifecycle autocmds.
+Does: Merges user options and installs focus tracking plus graceful terminal shutdown on Neovim exit.
+Architecture: Keeps autocmd setup separate from init.lua while receiving state and side-effect callbacks from the facade.
+]]
+
 local M = {}
 
 --- Merge user configuration and install pane lifecycle autocmds.

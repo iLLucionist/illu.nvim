@@ -1,3 +1,10 @@
+--[[
+markdown_pane.switcher
+Purpose: Control switching between markdown, Codex, Claude, IPython, and other pane terminal views.
+Does: Builds switcher entries, toggles markdown versus last coding agent, and dispatches selected entries to viewer or terminal callbacks.
+Architecture: Contains pane-mode routing logic while leaving window, terminal, and picker implementation details to injected dependencies.
+]]
+
 local M = {}
 
 --- Toggle between markdown view and the last coding-agent terminal.

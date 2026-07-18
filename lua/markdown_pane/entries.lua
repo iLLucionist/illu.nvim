@@ -1,3 +1,10 @@
+--[[
+markdown_pane.entries
+Purpose: Build normalized picker entries for configured pane tools.
+Does: Resolves presets, orders tools, marks running/current terminal sessions, and creates shortcut and numbered entries.
+Architecture: Shared entry factory for ask pickers and pane switchers so Codex, Claude, IPython, and custom tools present consistently.
+]]
+
 local util = require("markdown_pane.util")
 
 local M = {}

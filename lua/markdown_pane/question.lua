@@ -1,3 +1,10 @@
+--[[
+markdown_pane.question
+Purpose: Manage the editable ask prompt workflow for coding-agent terminals.
+Does: Captures selection context, opens the scratch prompt editor, tracks write-then-quit semantics, switches targets, and sends prompts.
+Architecture: Orchestrates selection, picker, and terminal callbacks while keeping prompt-buffer state in the shared plugin state table.
+]]
+
 local util = require("markdown_pane.util")
 local selection = require("markdown_pane.selection")
 

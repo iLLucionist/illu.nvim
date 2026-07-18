@@ -1,3 +1,10 @@
+--[[
+markdown_pane.init
+Purpose: Expose the public API and shared state for the markdown pane plugin.
+Does: Wires together viewer, window, render, switcher, terminal, question, lifecycle, and picker modules through dependency callbacks.
+Architecture: Acts as the facade module required by user config; substantial behavior lives in focused submodules to keep responsibilities separated.
+]]
+
 -- =============================================================================
 -- MODULE IMPORTS
 -- =============================================================================

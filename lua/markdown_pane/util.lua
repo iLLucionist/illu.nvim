@@ -1,3 +1,10 @@
+--[[
+markdown_pane.util
+Purpose: Provide small shared helpers used throughout the markdown pane plugin.
+Does: Normalizes paths and roots, validates buffers/windows/jobs, builds terminal commands/keys, and formats safe labels/fences.
+Architecture: Low-level utility module with no pane ownership; higher-level modules depend on it for common Neovim and filesystem operations.
+]]
+
 local M = {}
 
 --- Trim leading and trailing whitespace from text.

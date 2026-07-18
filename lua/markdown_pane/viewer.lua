@@ -1,3 +1,10 @@
+--[[
+markdown_pane.viewer
+Purpose: Manage the markdown viewer buffer and its document lifecycle.
+Does: Chooses default markdown files, creates and loads the viewer buffer, preserves scroll/cursor view, and switches the pane back to markdown.
+Architecture: Owns markdown-buffer behavior while delegating window placement, rendering, mappings, and terminal memory through dependencies.
+]]
+
 local util = require("markdown_pane.util")
 
 local M = {}

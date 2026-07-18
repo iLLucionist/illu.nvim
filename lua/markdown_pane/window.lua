@@ -1,3 +1,10 @@
+--[[
+markdown_pane.window
+Purpose: Own side-pane window sizing, options, focus, and zoom behavior.
+Does: Computes pane/text widths, creates or reuses the side split, applies markdown/terminal-local window options, and tracks focus restoration.
+Architecture: Isolates Neovim window side effects from viewer, terminal, and switcher logic through dependency callbacks.
+]]
+
 local util = require("markdown_pane.util")
 
 local M = {}

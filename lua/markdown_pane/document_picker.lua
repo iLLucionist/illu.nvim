@@ -1,3 +1,10 @@
+--[[
+markdown_pane.document_picker
+Purpose: Provide the Telescope-based markdown document picker.
+Does: Discovers markdown files with rg or glob fallback, builds picker entries, and opens the selected path through a callback.
+Architecture: Keeps document discovery and Telescope wiring outside the public facade while delegating pane opening back to init.lua.
+]]
+
 local util = require("markdown_pane.util")
 
 local M = {}
