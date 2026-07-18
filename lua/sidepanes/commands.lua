@@ -51,6 +51,15 @@ local subcommand_names = {
     "zoom",
 }
 
+local width_arg_names = {
+    "next",
+    "previous",
+    "prev",
+    "+",
+    "-",
+    "pick",
+}
+
 --- Register a user command unless its configured name is disabled.
 local function command(name, callback, opts)
     if not name then
@@ -140,6 +149,14 @@ local function complete_root(api, arg_lead, cmd_line)
         return matching(preset_names(api, args[2]), arg_lead)
     end
 
+    if subcommand == "width" then
+        if #args == 1 or (#args == 2 and not trailing_space) then
+            return matching(width_arg_names, arg_lead)
+        end
+
+        return {}
+    end
+
     return {}
 end
 
@@ -189,6 +206,19 @@ end
 local function dispatch_width(api, value)
     if not value or value == "" then
         vim.notify("Sidepanes width: " .. tostring(api.get_width()), vim.log.levels.INFO)
+        return
+    end
+
+    local text = value:match("^%s*(.-)%s*$")
+
+    if text == "next" or text == "+" then
+        api.snap_width("next")
+        return
+    elseif text == "previous" or text == "prev" or text == "-" then
+        api.snap_width("previous")
+        return
+    elseif text == "pick" then
+        api.width_picker()
         return
     end
 

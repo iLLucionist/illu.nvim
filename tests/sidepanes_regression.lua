@@ -708,6 +708,9 @@ test("command registration invokes facade callbacks", function()
         adjust_width = function(value)
             calls.adjust_width = value
         end,
+        snap_width = function(direction)
+            calls.snap_width = direction
+        end,
         width_picker = function()
             calls.width_picker = true
         end,
@@ -768,6 +771,12 @@ test("command registration invokes facade callbacks", function()
     assert(calls.set_width == "45%", "width command did not forward absolute width")
     vim.cmd("SidepanesTestWidth +5")
     assert(calls.adjust_width == "+5", "width command did not forward relative width")
+    vim.cmd("SidepanesTestWidth next")
+    assert(calls.snap_width == "next", "width command did not snap next")
+    vim.cmd("SidepanesTestWidth prev")
+    assert(calls.snap_width == "previous", "width command did not snap previous")
+    vim.cmd("SidepanesTestWidth pick")
+    assert(calls.width_picker == true, "width command did not open picker alias")
     capture_notify(function()
         vim.cmd("SidepanesTestWidth")
     end)
@@ -839,6 +848,9 @@ test("root command dispatches subcommands and completes choices", function()
         adjust_width = function(value)
             calls.adjust_width = value
         end,
+        snap_width = function(direction)
+            calls.snap_width = direction
+        end,
         width_picker = function()
             calls.width_picker = true
         end,
@@ -909,6 +921,16 @@ test("root command dispatches subcommands and completes choices", function()
     assert(calls.set_width == "1/2", "root width subcommand did not forward absolute width")
     vim.cmd("SidepanesRootTest width -4")
     assert(calls.adjust_width == "-4", "root width subcommand did not forward relative width")
+    vim.cmd("SidepanesRootTest width next")
+    assert(calls.snap_width == "next", "root width subcommand did not snap next")
+    vim.cmd("SidepanesRootTest width previous")
+    assert(calls.snap_width == "previous", "root width subcommand did not snap previous")
+    vim.cmd("SidepanesRootTest width +")
+    assert(calls.snap_width == "next", "root width plus alias did not snap next")
+    vim.cmd("SidepanesRootTest width -")
+    assert(calls.snap_width == "previous", "root width minus alias did not snap previous")
+    vim.cmd("SidepanesRootTest width pick")
+    assert(calls.width_picker == true, "root width pick alias did not call picker")
     capture_notify(function()
         vim.cmd("SidepanesRootTest width")
     end)
@@ -934,6 +956,9 @@ test("root command dispatches subcommands and completes choices", function()
 
     assert(vim.tbl_contains(subcommands, "codex"), "root completion did not include codex")
     assert(vim.tbl_contains(width_subcommands, "width-pick"), "root completion did not include width-pick")
+    assert(vim.tbl_contains(width_subcommands, "width"), "root completion did not include width")
+    local width_args = vim.fn.getcompletion("SidepanesRootTest width n", "cmdline")
+    assert(vim.tbl_contains(width_args, "next"), "root width completion did not include next")
     assert(vim.tbl_contains(tool_names, "codex"), "root tool completion did not include codex")
     assert(vim.tbl_contains(codex_presets, "gpt55_high_fast"), "root codex completion did not include preset")
     assert(vim.tbl_contains(claude_presets, "sonnet"), "root claude completion did not include preset")

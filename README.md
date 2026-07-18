@@ -198,11 +198,14 @@ Set `commands = true` to register the default `:Sidepanes*` commands. Set `mappi
 :Sidepanes width 100
 :Sidepanes width 50%
 :Sidepanes width +10
+:Sidepanes width next
+:Sidepanes width previous
+:Sidepanes width pick
 :Sidepanes width-pick
 :Sidepanes help
 ```
 
-With commands enabled, `:SidepanesWidth` accepts the same width values as `:Sidepanes width`; `:SidepanesWidthPick` opens the width picker.
+With commands enabled, `:SidepanesWidth` accepts the same width values as `:Sidepanes width`. Width commands also accept `next`, `previous`, `prev`, `+`, `-`, and `pick`; `:SidepanesWidthPick` opens the width picker directly.
 
 Run `:checkhealth sidepanes` to inspect external commands, optional dependencies, tool presets, command registration, and mapping configuration.
 

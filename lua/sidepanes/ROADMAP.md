@@ -39,11 +39,19 @@ Recently completed or in progress:
 
 ### 1. Commit Current API And Width Pass
 
-Status: ready to commit.
+Status: completed.
 
 Commit the current public API, switch target, width command, documentation, and regression coverage work.
 
-This now includes setup-time width units, sticky relative width, and the `<leader>p%` sticky toggle.
+Completed commits:
+
+- `fbf63a7` finalized the Sidepanes public API surface.
+- `4bd0959` added relative Sidepanes width controls.
+- `17030a1` added width snap mappings.
+- `a5c2571` added width picker feedback.
+- `fa3c077` hardened width picker checks.
+
+This includes setup-time width units, sticky relative width, the `<leader>p%` sticky toggle, width snap mappings, snap feedback, and width picker coverage.
 
 Acceptance:
 
@@ -95,6 +103,7 @@ Completed decisions:
 - Snapping cooperates with `layout.sticky_relative_width` by preserving relative snap targets when enabled.
 - Keep `width_picker_points` shorter than `width_snap_points` so the picker remains fast to read.
 - Use `<leader>pw`, `:SidepanesWidthPick`, and `:Sidepanes width-pick` for explicit width picking.
+- Support readable command aliases through `:Sidepanes width next`, `:Sidepanes width previous`, and `:Sidepanes width pick`.
 
 ### 4. Docs Split
 
