@@ -25,6 +25,19 @@ M.config = {
     commands = false,
     mappings = {
         global = false,
+        pane = {
+            markdown = "<space>0",
+            codex = "<space>x",
+            claude = "<space>c",
+            ipython = "<space>i",
+            toggle_agent = "<leader>gg",
+            toggle_agent_alt = "<C-g>",
+            ipython_alt = "<leader>gi",
+            gf = "gf",
+            ask_last = "aa",
+            ask_codex = "ax",
+            ask_claude = "ac",
+        },
     },
     tools = {
         codex = {

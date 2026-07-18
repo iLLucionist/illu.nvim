@@ -225,6 +225,9 @@ setup_pane_maps = function(bufnr)
             return M.bufnr
         end,
         open_terminal = M.open_terminal,
+        pane_mappings = function()
+            return M.config.mappings and M.config.mappings.pane
+        end,
         pane_root = pane_root,
         show_markdown = M.show_markdown,
         toggle_markdown_agent = M.toggle_markdown_agent,

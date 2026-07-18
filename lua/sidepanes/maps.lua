@@ -9,6 +9,10 @@ local M = {}
 
 --- Install one buffer-local pane mapping.
 local function map(bufnr, mode, lhs, rhs, desc, opts)
+    if not lhs then
+        return
+    end
+
     opts = opts or {}
 
     vim.keymap.set(mode, lhs, rhs, {
@@ -28,51 +32,61 @@ local function visual_opts(bufnr)
     }
 end
 
+--- Return pane-local mapping config, falling back to an empty table.
+local function pane_mappings(deps)
+    if not deps.pane_mappings then
+        return {}
+    end
+
+    return deps.pane_mappings() or {}
+end
+
 --- Install pane-local normal and visual mappings for one pane buffer.
 function M.setup(bufnr, deps)
     deps = deps or {}
+    local mappings = pane_mappings(deps)
 
-    map(bufnr, "n", "<space>0", function()
+    map(bufnr, "n", mappings.markdown, function()
         deps.show_markdown()
     end, "Show sidepanes", { nowait = true })
 
-    map(bufnr, "n", "<space>x", function()
+    map(bufnr, "n", mappings.codex, function()
         deps.open_terminal("codex", nil, { root = deps.pane_root(bufnr), focus = true })
     end, "Show Codex pane", { nowait = true })
 
-    map(bufnr, "n", "<space>c", function()
+    map(bufnr, "n", mappings.claude, function()
         deps.open_terminal("claude", nil, { root = deps.pane_root(bufnr), focus = true })
     end, "Show Claude pane", { nowait = true })
 
-    map(bufnr, "n", "<space>i", function()
+    map(bufnr, "n", mappings.ipython, function()
         deps.open_terminal("ipython", nil, { root = deps.pane_root(bufnr), focus = true })
     end, "Show IPython pane", { nowait = true })
 
-    map(bufnr, "n", "<leader>gg", function()
+    map(bufnr, "n", mappings.toggle_agent, function()
         deps.toggle_markdown_agent()
     end, "Toggle markdown/agent pane")
 
-    map(bufnr, "n", "<C-g>", function()
+    map(bufnr, "n", mappings.toggle_agent_alt, function()
         deps.toggle_markdown_agent()
     end, "Toggle markdown/agent pane")
 
-    map(bufnr, "n", "<leader>gi", function()
+    map(bufnr, "n", mappings.ipython_alt, function()
         deps.open_terminal("ipython", nil, { root = deps.pane_root(bufnr), focus = true })
     end, "Show IPython pane")
 
-    map(bufnr, "n", "gf", function()
+    map(bufnr, "n", mappings.gf, function()
         require("smart_gf").open()
     end, "Smart go to file from pane")
 
-    map(bufnr, "x", "aa", function()
+    map(bufnr, "x", mappings.ask_last, function()
         deps.ask_last_coding_agent(visual_opts(bufnr))
     end, "Ask last coding agent")
 
-    map(bufnr, "x", "ax", function()
+    map(bufnr, "x", mappings.ask_codex, function()
         deps.ask_current_coding_agent("codex", visual_opts(bufnr))
     end, "Ask current Codex pane")
 
-    map(bufnr, "x", "ac", function()
+    map(bufnr, "x", mappings.ask_claude, function()
         deps.ask_current_coding_agent("claude", visual_opts(bufnr))
     end, "Ask current Claude pane")
 

@@ -7,6 +7,7 @@ local pane_context = require("sidepanes.context")
 local document_picker = require("sidepanes.document_picker")
 local entries = require("sidepanes.entries")
 local global_maps = require("sidepanes.global_maps")
+local local_maps = require("sidepanes.maps")
 local presets = require("sidepanes.presets")
 local util = require("sidepanes.util")
 local markdown_reflow = require("markdown_reflow")
@@ -26,8 +27,18 @@ local function write(path, lines)
     vim.fn.writefile(lines, path)
 end
 
-local function has_map(bufnr, lhs)
-    for _, map in ipairs(vim.api.nvim_buf_get_keymap(bufnr, "n")) do
+local function has_map(bufnr, lhs, mode)
+    for _, map in ipairs(vim.api.nvim_buf_get_keymap(bufnr, mode or "n")) do
+        if map.lhs == lhs then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function has_nowait_map(bufnr, lhs, mode)
+    for _, map in ipairs(vim.api.nvim_buf_get_keymap(bufnr, mode or "n")) do
         if map.lhs == lhs and map.nowait == 1 then
             return true
         end
@@ -36,8 +47,8 @@ local function has_map(bufnr, lhs)
     return false
 end
 
-local function find_map(bufnr, lhs)
-    for _, map in ipairs(vim.api.nvim_buf_get_keymap(bufnr, "n")) do
+local function find_map(bufnr, lhs, mode)
+    for _, map in ipairs(vim.api.nvim_buf_get_keymap(bufnr, mode or "n")) do
         if map.lhs == lhs then
             return map
         end
@@ -46,8 +57,8 @@ local function find_map(bufnr, lhs)
     error("missing map: " .. lhs)
 end
 
-local function call_map(bufnr, lhs)
-    local map = find_map(bufnr, lhs)
+local function call_map(bufnr, lhs, mode)
+    local map = find_map(bufnr, lhs, mode)
 
     assert(map.callback, lhs .. " has no callback")
     map.callback()
@@ -137,14 +148,96 @@ test("pane-local slot maps exist on markdown and terminal panes", function()
     pane.open(root .. "/docs/doc.md")
 
     for _, lhs in ipairs({ " 0", " x", " c", " i" }) do
-        assert(has_map(pane.bufnr, lhs), lhs .. " missing on sidepanes")
+        assert(has_nowait_map(pane.bufnr, lhs), lhs .. " missing on sidepanes")
     end
 
     local ctx = pane.open_terminal("ipython", nil, { root = root, focus = true })
 
     for _, lhs in ipairs({ " 0", " x", " c", " i" }) do
-        assert(has_map(ctx.bufnr, lhs), lhs .. " missing on terminal pane")
+        assert(has_nowait_map(ctx.bufnr, lhs), lhs .. " missing on terminal pane")
     end
+end)
+
+test("pane-local mappings are configurable", function()
+    local bufnr = vim.api.nvim_create_buf(false, true)
+    local calls = {}
+
+    local_maps.setup(bufnr, {
+        ask_current_coding_agent = function(tool_name, opts)
+            calls.ask_current = { tool_name = tool_name, opts = opts }
+        end,
+        ask_last_coding_agent = function(opts)
+            calls.ask_last = opts
+        end,
+        markdown_bufnr = function()
+            return bufnr
+        end,
+        open_terminal = function(tool_name, preset_name, opts)
+            calls.open_terminal = { tool_name = tool_name, preset_name = preset_name, opts = opts }
+        end,
+        pane_mappings = function()
+            return {
+                markdown = "m0",
+                codex = "mx",
+                claude = "mc",
+                ipython = "mi",
+                toggle_agent = "mg",
+                toggle_agent_alt = false,
+                ipython_alt = false,
+                gf = "mf",
+                ask_last = "ma",
+                ask_codex = "mx",
+                ask_claude = "mc",
+            }
+        end,
+        pane_root = function()
+            return "/private/tmp/illu-custom-pane-map-root"
+        end,
+        show_markdown = function()
+            calls.markdown = true
+        end,
+        toggle_markdown_agent = function()
+            calls.toggle_agent = true
+        end,
+        toggle_wrap = function()
+            calls.wrap = true
+        end,
+        wrap_toggle_key = function()
+            return "mw"
+        end,
+    })
+
+    assert(has_nowait_map(bufnr, "m0"), "custom markdown-viewer map missing")
+    assert(has_nowait_map(bufnr, "mx"), "custom Codex pane map missing")
+    assert(has_nowait_map(bufnr, "mc"), "custom Claude pane map missing")
+    assert(has_nowait_map(bufnr, "mi"), "custom IPython pane map missing")
+    assert(has_map(bufnr, "mg"), "custom toggle-agent pane map missing")
+    assert(has_map(bufnr, "mf"), "custom smart-gf pane map missing")
+    assert(has_map(bufnr, "ma", "x"), "custom ask-last pane map missing")
+    assert(has_map(bufnr, "mx", "x"), "custom ask-Codex pane map missing")
+    assert(has_map(bufnr, "mc", "x"), "custom ask-Claude pane map missing")
+    assert(not has_map(bufnr, "<C-g>"), "disabled toggle-agent alternate map was installed")
+    assert(not has_map(bufnr, "<leader>gi"), "disabled IPython alternate map was installed")
+
+    call_map(bufnr, "m0")
+    assert(calls.markdown == true, "custom markdown-viewer map did not call show_markdown")
+    call_map(bufnr, "mx")
+    assert(calls.open_terminal.tool_name == "codex", "custom Codex pane map used wrong tool")
+    assert(calls.open_terminal.opts.root == "/private/tmp/illu-custom-pane-map-root", "custom Codex pane map lost pane root")
+    call_map(bufnr, "mc")
+    assert(calls.open_terminal.tool_name == "claude", "custom Claude pane map used wrong tool")
+    call_map(bufnr, "mi")
+    assert(calls.open_terminal.tool_name == "ipython", "custom IPython pane map used wrong tool")
+    call_map(bufnr, "mg")
+    assert(calls.toggle_agent == true, "custom toggle-agent pane map did not call toggle")
+    call_map(bufnr, "ma", "x")
+    assert(calls.ask_last.bufnr == bufnr and calls.ask_last.visual == true, "custom ask-last pane map did not pass visual opts")
+    call_map(bufnr, "mx", "x")
+    assert(calls.ask_current.tool_name == "codex", "custom ask-Codex pane map used wrong tool")
+    call_map(bufnr, "mc", "x")
+    assert(calls.ask_current.tool_name == "claude", "custom ask-Claude pane map used wrong tool")
+    call_map(bufnr, "mw")
+    assert(calls.wrap == true, "wrap toggle key no longer worked beside pane mappings")
 end)
 
 test("document picker entries preserve display and resolve absolute values", function()

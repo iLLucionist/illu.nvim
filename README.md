@@ -39,10 +39,23 @@ require("sidepanes").setup({
       send_ipython = "<leader>pl",
       ask = "<leader>pa",
     },
+    pane = {
+      markdown = "<space>0",
+      codex = "<space>x",
+      claude = "<space>c",
+      ipython = "<space>i",
+      toggle_agent = "<leader>gg",
+      toggle_agent_alt = "<C-g>",
+      ipython_alt = "<leader>gi",
+      gf = "gf",
+      ask_last = "aa",
+      ask_codex = "ax",
+      ask_claude = "ac",
+    },
   },
 })
 ```
 
 For reusable generated tool tables, use `require("sidepanes.presets").codex(...)` or `require("sidepanes.presets").claude(...)`.
 
-Set `commands = true` to register the default `:Sidepanes*` and `:Pane*` commands. Set `mappings.global` to a table to install global mappings; pane-local mappings remain managed separately inside sidepanes buffers.
+Set `commands = true` to register the default `:Sidepanes*` and `:Pane*` commands. Set `mappings.global` to a table to install global mappings. `mappings.pane` customizes buffer-local pane mappings; set an entry to `false` to disable it.
