@@ -34,6 +34,7 @@ Recently completed or in progress:
 - `snap_width(direction)` and `<leader>p-` / `<leader>p+` move to configured width snap points.
 - Width snapping reports the current, previous, and next snap points after use.
 - `width_picker()` / `<leader>pw` / `:SidepanesWidthPick` pick from configurable common width points.
+- Width command aliases cover next, previous, prev, +, -, and pick through both `:SidepanesWidth` and `:Sidepanes width`.
 
 ## Roadmap
 
@@ -50,6 +51,7 @@ Completed commits:
 - `17030a1` added width snap mappings.
 - `a5c2571` added width picker feedback.
 - `fa3c077` hardened width picker checks.
+- `b998d62` added Sidepanes width command aliases.
 
 This includes setup-time width units, sticky relative width, the `<leader>p%` sticky toggle, width snap mappings, snap feedback, and width picker coverage.
 
@@ -103,7 +105,8 @@ Completed decisions:
 - Snapping cooperates with `layout.sticky_relative_width` by preserving relative snap targets when enabled.
 - Keep `width_picker_points` shorter than `width_snap_points` so the picker remains fast to read.
 - Use `<leader>pw`, `:SidepanesWidthPick`, and `:Sidepanes width-pick` for explicit width picking.
-- Support readable command aliases through `:Sidepanes width next`, `:Sidepanes width previous`, and `:Sidepanes width pick`.
+- Support readable command aliases through `:Sidepanes width next`, `:Sidepanes width previous`, `:Sidepanes width prev`, `:Sidepanes width +`, `:Sidepanes width -`, and `:Sidepanes width pick`.
+- Support the same aliases through the standalone `:SidepanesWidth` command.
 
 ### 4. Docs Split
 
