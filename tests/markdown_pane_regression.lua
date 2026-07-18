@@ -2,6 +2,7 @@ vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
 local defaults = require("markdown_pane.defaults")
 local entries = require("markdown_pane.entries")
+local markdown_reflow = require("markdown_reflow")
 local pane = require("markdown_pane")
 
 local tests = {}
@@ -299,6 +300,44 @@ test("question write then quit sends prompt and focuses terminal", function()
     assert(pane.active_mode == "codex", "send did not activate Codex")
 end)
 
+test("question write without quit does not send", function()
+    reset_pane()
+
+    local root = root_fixture("question-write-only-test")
+    local out = "/private/tmp/illu-question-write-only.txt"
+
+    pcall(vim.fn.delete, out)
+    write(root .. "/src/origin.py", { "print('origin')" })
+
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "tee -a " .. out },
+                send_delay_ms = 0,
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    vim.cmd.edit(root .. "/src/origin.py")
+    pane.ask("codex", nil, { bufnr = vim.api.nvim_get_current_buf() })
+
+    local qbuf = only_question_buf()
+
+    set_question(qbuf, { "Question:", "draft but do not send" })
+    pane.write_question(qbuf)
+    vim.wait(150, function()
+        return false
+    end, 20)
+
+    assert(read_file(out) == "", "write-only question sent to terminal")
+    assert(pane.question_buffers[qbuf] ~= nil, "write-only question closed the editor")
+
+    pane.finish_question(qbuf)
+    wait_for_file(out, "draft but do not send")
+end)
+
 test("asking with a new preset reuses the same agent session and sends a model switch", function()
     reset_pane()
 
@@ -411,6 +450,50 @@ test("zoom focuses pane and caps markdown text width", function()
 
     assert(vim.api.nvim_get_current_win() == pane.winid, "zoom did not focus pane")
     assert(pane.text_width() <= 90, "zoom text width exceeded cap")
+end)
+
+test("external mdfmt reflow preserves markdown tables", function()
+    if vim.fn.executable("mdfmt") ~= 1 then
+        return
+    end
+
+    local bufnr = vim.api.nvim_create_buf(false, true)
+    local table_block = {
+        "| Name | Value |",
+        "| ---- | ----- |",
+        "| alpha | one two three |",
+        "| beta | four five six |",
+    }
+    local lines = {
+        "# Doc",
+        "",
+        "This paragraph is intentionally long enough that mdfmt should wrap it when a narrow width is requested for the external reflow test.",
+        "",
+        table_block[1],
+        table_block[2],
+        table_block[3],
+        table_block[4],
+    }
+
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    markdown_reflow.reflow_buffer(bufnr, {
+        width = 48,
+        notify = false,
+        external_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" },
+        external_reflow_protect_tables = true,
+        external_reflow_fallback = false,
+    })
+
+    local output = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
+    local found = {}
+
+    for _, line in ipairs(output) do
+        if line:find("^|") then
+            table.insert(found, line)
+        end
+    end
+
+    assert(vim.deep_equal(found, table_block), table.concat(output, "\n"))
 end)
 
 test("smart gf from IPython pane opens traceback file and line outside pane", function()
