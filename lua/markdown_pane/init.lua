@@ -1,3 +1,9 @@
+local defaults = require("markdown_pane.defaults")
+local heading = require("markdown_pane.heading")
+local picker = require("markdown_pane.picker")
+local selection = require("markdown_pane.selection")
+local util = require("markdown_pane.util")
+
 local M = {
     winid = nil,
     bufnr = nil,
@@ -13,210 +19,36 @@ local M = {
     markdown_view = nil,
     terminals = {},
     question_buffers = {},
-    config = {
-        width = 100,
-        wrap = false,
-        auto_reflow = true,
-        external_reflow_cmd = nil,
-        external_reflow_fallback = true,
-        external_reflow_protect_tables = true,
-        reflow_margin = 8,
-        zoom_text_width = 90,
-        sticky_heading = true,
-        wrap_toggle_key = "<leader>mw",
-        focus_on_switch = true,
-        focus_on_ask = true,
-        shutdown_on_exit = true,
-        shutdown_timeout_ms = 300,
-        tools = {
-            codex = {
-                label = "Codex",
-                cmd = "codex",
-                include_cd_arg = true,
-                send_delay_ms = 700,
-                switch_command = "/model {model} {effort} {speed}",
-                exit_command = "/quit\r",
-                presets = {
-                    {
-                        name = "gpt55_high_fast",
-                        label = "GPT-5.5 / high / fast",
-                        model = "gpt-5.5",
-                        effort = "high",
-                        speed = "fast",
-                        args = { "--model", "gpt-5.5", "-c", 'model_reasoning_effort="high"', "-c", 'service_tier="priority"' },
-                    },
-                    {
-                        name = "gpt55_medium_fast",
-                        label = "GPT-5.5 / medium / fast",
-                        model = "gpt-5.5",
-                        effort = "medium",
-                        speed = "fast",
-                        args = { "--model", "gpt-5.5", "-c", 'model_reasoning_effort="medium"', "-c", 'service_tier="priority"' },
-                    },
-                    {
-                        name = "gpt55_xhigh_fast",
-                        label = "GPT-5.5 / extra high / fast",
-                        model = "gpt-5.5",
-                        effort = "xhigh",
-                        speed = "fast",
-                        args = { "--model", "gpt-5.5", "-c", 'model_reasoning_effort="xhigh"', "-c", 'service_tier="priority"' },
-                    },
-                    {
-                        name = "gpt55_high_normal",
-                        label = "GPT-5.5 / high / normal",
-                        model = "gpt-5.5",
-                        effort = "high",
-                        speed = "normal",
-                        args = { "--model", "gpt-5.5", "-c", 'model_reasoning_effort="high"' },
-                    },
-                    {
-                        name = "gpt55_medium_normal",
-                        label = "GPT-5.5 / medium / normal",
-                        model = "gpt-5.5",
-                        effort = "medium",
-                        speed = "normal",
-                        args = { "--model", "gpt-5.5", "-c", 'model_reasoning_effort="medium"' },
-                    },
-                    {
-                        name = "gpt55_xhigh_normal",
-                        label = "GPT-5.5 / extra high / normal",
-                        model = "gpt-5.5",
-                        effort = "xhigh",
-                        speed = "normal",
-                        args = { "--model", "gpt-5.5", "-c", 'model_reasoning_effort="xhigh"' },
-                    },
-                    {
-                        name = "gpt56_sol_high_fast",
-                        label = "GPT-5.6 Sol / high / fast",
-                        model = "gpt-5.6-sol",
-                        effort = "high",
-                        speed = "fast",
-                        args = { "--model", "gpt-5.6-sol", "-c", 'model_reasoning_effort="high"', "-c", 'service_tier="priority"' },
-                    },
-                    {
-                        name = "gpt56_sol_medium_fast",
-                        label = "GPT-5.6 Sol / medium / fast",
-                        model = "gpt-5.6-sol",
-                        effort = "medium",
-                        speed = "fast",
-                        args = { "--model", "gpt-5.6-sol", "-c", 'model_reasoning_effort="medium"', "-c", 'service_tier="priority"' },
-                    },
-                    {
-                        name = "gpt56_sol_xhigh_fast",
-                        label = "GPT-5.6 Sol / extra high / fast",
-                        model = "gpt-5.6-sol",
-                        effort = "xhigh",
-                        speed = "fast",
-                        args = { "--model", "gpt-5.6-sol", "-c", 'model_reasoning_effort="xhigh"', "-c", 'service_tier="priority"' },
-                    },
-                    {
-                        name = "gpt56_sol_high_normal",
-                        label = "GPT-5.6 Sol / high / normal",
-                        model = "gpt-5.6-sol",
-                        effort = "high",
-                        speed = "normal",
-                        args = { "--model", "gpt-5.6-sol", "-c", 'model_reasoning_effort="high"' },
-                    },
-                    {
-                        name = "gpt56_sol_medium_normal",
-                        label = "GPT-5.6 Sol / medium / normal",
-                        model = "gpt-5.6-sol",
-                        effort = "medium",
-                        speed = "normal",
-                        args = { "--model", "gpt-5.6-sol", "-c", 'model_reasoning_effort="medium"' },
-                    },
-                    {
-                        name = "gpt56_sol_xhigh_normal",
-                        label = "GPT-5.6 Sol / extra high / normal",
-                        model = "gpt-5.6-sol",
-                        effort = "xhigh",
-                        speed = "normal",
-                        args = { "--model", "gpt-5.6-sol", "-c", 'model_reasoning_effort="xhigh"' },
-                    },
-                },
-            },
-            claude = {
-                label = "Claude",
-                cmd = "claude",
-                send_delay_ms = 700,
-                switch_command = "/model {model} {effort}",
-                exit_command = "/exit\r",
-                presets = {
-                    {
-                        name = "sonnet",
-                        label = "Sonnet / normal",
-                        model = "sonnet",
-                        effort = "medium",
-                        args = { "--model", "sonnet", "--effort", "medium" },
-                    },
-                    {
-                        name = "sonnet_high",
-                        label = "Sonnet / high",
-                        model = "sonnet",
-                        effort = "high",
-                        args = { "--model", "sonnet", "--effort", "high" },
-                    },
-                    {
-                        name = "opus_high",
-                        label = "Opus / high",
-                        model = "opus",
-                        effort = "high",
-                        args = { "--model", "opus", "--effort", "high" },
-                    },
-                    {
-                        name = "fable_high",
-                        label = "Fable / high",
-                        model = "fable",
-                        effort = "high",
-                        args = { "--model", "fable", "--effort", "high" },
-                    },
-                    {
-                        name = "default",
-                        label = "Default",
-                        args = {},
-                    },
-                },
-            },
-            ipython = {
-                label = "IPython",
-                ask = false,
-                cmd = function()
-                    if vim.fn.executable("uv") == 1 then
-                        return { "uv", "run", "ipython" }
-                    end
-
-                    return { "ipython" }
-                end,
-                send_delay_ms = 500,
-                exit_command = "quit()\r",
-                presets = {
-                    {
-                        name = "default",
-                        label = "Default",
-                        args = {},
-                    },
-                },
-            },
-        },
-    },
+    config = vim.deepcopy(defaults.config),
 }
 
 local sticky_heading_group = vim.api.nvim_create_augroup("MarkdownPaneStickyHeading", { clear = true })
 local focus_group = vim.api.nvim_create_augroup("MarkdownPaneFocus", { clear = true })
 local shutdown_group = vim.api.nvim_create_augroup("MarkdownPaneShutdown", { clear = true })
 
-local function trim(text)
-    return (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+local trim = util.trim
+local valid_win = util.valid_win
+local valid_buf = util.valid_buf
+local is_running = util.is_running
+local resolve_path = util.resolve_path
+local project_root = util.project_root
+local project_root_for_path = util.project_root_for_path
+local relative_path = util.relative_path
+local root_label = util.root_label
+local terminal_key = util.terminal_key
+local sanitize_name = util.sanitize_name
+local command_list = util.command_list
+local executable_exists = util.executable_exists
+local statusline_escape = heading.statusline_escape
+local truncate_display = heading.truncate_display
+local active_heading = heading.active_heading
+
+--- Show a numbered/lettered picker and pass the selected entry to a callback.
+local function numbered_select(prompt, entries, callback)
+    picker.numbered_select(prompt, entries, callback, M)
 end
 
-local function valid_win(winid)
-    return winid and vim.api.nvim_win_is_valid(winid)
-end
-
-local function valid_buf(bufnr)
-    return bufnr and vim.api.nvim_buf_is_valid(bufnr)
-end
-
+--- Return whether a buffer belongs to the pane or one of its terminals.
 local function is_pane_buf(bufnr)
     if not valid_buf(bufnr) then
         return false
@@ -235,6 +67,7 @@ local function is_pane_buf(bufnr)
     return false
 end
 
+--- Remember the most recent normal window outside the pane.
 local function record_focus_win(winid)
     winid = winid or vim.api.nvim_get_current_win()
 
@@ -255,107 +88,7 @@ local function record_focus_win(winid)
     M.last_focus_win = winid
 end
 
-local function is_running(job_id)
-    return job_id and vim.fn.jobwait({ job_id }, 0)[1] == -1
-end
-
-local function resolve_path(path)
-    if not path or path == "" then
-        return nil
-    end
-
-    local expanded = vim.fn.expand(path)
-
-    if expanded == "" then
-        expanded = path
-    end
-
-    return vim.fn.fnamemodify(expanded, ":p")
-end
-
-local function normalize_project_root(root)
-    root = vim.fn.fnamemodify(root or vim.fn.getcwd(), ":p")
-
-    if vim.fn.fnamemodify(root:gsub("/$", ""), ":t") == ".git" then
-        return vim.fn.fnamemodify(root, ":h:h:p")
-    end
-
-    return root
-end
-
-local function project_root(bufnr)
-    bufnr = bufnr or vim.api.nvim_get_current_buf()
-
-    local ok, root
-
-    if vim.fs and vim.fs.root then
-        ok, root = pcall(vim.fs.root, bufnr, { ".git" })
-
-        if ok and root then
-            return normalize_project_root(root)
-        end
-    end
-
-    local name = vim.api.nvim_buf_get_name(bufnr)
-    local start = name ~= "" and vim.fn.fnamemodify(name, ":p:h") or vim.fn.getcwd()
-
-    if vim.fs and vim.fs.find then
-        local found = vim.fs.find(".git", { path = start, upward = true })[1]
-
-        if found then
-            return normalize_project_root(found)
-        end
-    end
-
-    return normalize_project_root(start)
-end
-
-local function project_root_for_path(path)
-    if not path or path == "" then
-        return project_root()
-    end
-
-    local start = vim.fn.fnamemodify(path, ":p:h")
-
-    if vim.fs and vim.fs.find then
-        local found = vim.fs.find(".git", { path = start, upward = true })[1]
-
-        if found then
-            return normalize_project_root(found)
-        end
-    end
-
-    return normalize_project_root(start)
-end
-
-local function relative_path(path, root)
-    if not path or path == "" then
-        return "[No file name]"
-    end
-
-    path = vim.fn.fnamemodify(path, ":p")
-    root = root and vim.fn.fnamemodify(root, ":p") or nil
-
-    if root and vim.startswith(path, root) then
-        return path:sub(#root + 1)
-    end
-
-    return vim.fn.fnamemodify(path, ":.")
-end
-
-local function root_label(root)
-    local normalized = vim.fn.fnamemodify(root or vim.fn.getcwd(), ":p"):gsub("/$", "")
-
-    return vim.fn.fnamemodify(normalized, ":t")
-end
-
-local function terminal_key(tool_name, root)
-    return table.concat({
-        tool_name,
-        vim.fn.fnamemodify(root or vim.fn.getcwd(), ":p"),
-    }, "::")
-end
-
+--- Find the pane terminal context for a buffer.
 local function terminal_context_for_buf(bufnr)
     for _, ctx in pairs(M.terminals) do
         if ctx.bufnr == bufnr then
@@ -366,14 +99,17 @@ local function terminal_context_for_buf(bufnr)
     return nil
 end
 
+--- Return whether a terminal context still has a live job and buffer.
 local function terminal_is_running(ctx)
     return ctx and valid_buf(ctx.bufnr) and is_running(ctx.job_id)
 end
 
+--- Return whether a tool is one of the conversational coding agents.
 local function is_coding_agent_tool(tool_name)
     return tool_name == "codex" or tool_name == "claude"
 end
 
+--- Remember the latest active terminal and per-tool coding-agent terminal.
 local function remember_terminal_context(ctx)
     if not ctx then
         return
@@ -387,6 +123,7 @@ local function remember_terminal_context(ctx)
     end
 end
 
+--- Build a picker entry representing an already-running terminal context.
 local function entry_for_terminal_context(ctx)
     local tool = (M.config.tools or {})[ctx.tool_name] or {}
 
@@ -403,6 +140,7 @@ local function entry_for_terminal_context(ctx)
     }
 end
 
+--- Find the best running terminal context for a tool and optional root.
 local function terminal_context_for_tool(tool_name, root)
     local last_key = M.last_tool_terminal_keys and M.last_tool_terminal_keys[tool_name] or nil
     local last_ctx = last_key and M.terminals[last_key] or nil
@@ -426,6 +164,7 @@ local function terminal_context_for_tool(tool_name, root)
     return nil
 end
 
+--- Find the most recently used running Codex or Claude context.
 local function last_coding_agent_context(root)
     local last_ctx = M.last_coding_agent_terminal_key and M.terminals[M.last_coding_agent_terminal_key] or nil
 
@@ -450,43 +189,7 @@ local function last_coding_agent_context(root)
     return nil
 end
 
-local function sanitize_name(text)
-    return (text or ""):gsub("[^%w_.-]", "_")
-end
-
-local function command_list(tool, preset, root)
-    local cmd = tool.cmd or tool.command
-
-    if type(cmd) == "function" then
-        cmd = cmd(root, preset, tool)
-    end
-
-    local result = type(cmd) == "table" and vim.deepcopy(cmd) or { cmd }
-
-    if tool.include_cd_arg then
-        vim.list_extend(result, { "--cd", root })
-    end
-
-    vim.list_extend(result, vim.deepcopy(tool.args or {}))
-    vim.list_extend(result, vim.deepcopy(preset.args or {}))
-
-    return result
-end
-
-local function executable_exists(cmd)
-    return cmd and cmd ~= "" and (cmd:find("/") or vim.fn.executable(cmd) == 1)
-end
-
-local function fence_for(text)
-    local fence = "```"
-
-    while text:find(fence, 1, true) do
-        fence = fence .. "`"
-    end
-
-    return fence
-end
-
+--- Resolve the default markdown file for the current working tree.
 local function default_path()
     if vim.bo.filetype == "markdown" then
         local current = vim.api.nvim_buf_get_name(0)
@@ -505,6 +208,7 @@ local function default_path()
     return nil
 end
 
+--- Return the user-selected wrap state or configured wrap default.
 local function preferred_wrap()
     if M.wrap_enabled == nil then
         return M.config.wrap
@@ -513,10 +217,12 @@ local function preferred_wrap()
     return M.wrap_enabled
 end
 
+--- Return the wrap state after considering zoom mode.
 local function effective_wrap()
     return preferred_wrap()
 end
 
+--- Compute the pane width for normal or zoomed layout.
 local function pane_width()
     if not M.zoomed then
         return M.config.width
@@ -529,6 +235,7 @@ local function pane_width()
     return math.max(M.config.width, max_width)
 end
 
+--- Compute the text reflow width available inside the pane.
 local function pane_text_width(winid)
     winid = winid or M.winid
 
@@ -551,6 +258,7 @@ local function pane_text_width(winid)
     return text_width
 end
 
+--- Save the markdown pane cursor and scroll view for later restoration.
 local function save_markdown_view()
     if not valid_win(M.winid) or not valid_buf(M.bufnr) then
         return
@@ -570,6 +278,7 @@ local function save_markdown_view()
     end
 end
 
+--- Restore the saved markdown cursor and scroll view when possible.
 local function restore_markdown_view()
     if not valid_win(M.winid) or not M.markdown_view then
         return
@@ -584,111 +293,7 @@ local function restore_markdown_view()
     end)
 end
 
-local function statusline_escape(text)
-    return text:gsub("%%", "%%%%")
-end
-
-local function truncate_display(text, max_width)
-    if vim.fn.strdisplaywidth(text) <= max_width then
-        return text
-    end
-
-    local ellipsis = "..."
-    local chars = vim.fn.strchars(text)
-
-    while chars > 0 do
-        local candidate = vim.fn.strcharpart(text, 0, chars) .. ellipsis
-
-        if vim.fn.strdisplaywidth(candidate) <= max_width then
-            return candidate
-        end
-
-        chars = chars - 1
-    end
-
-    return ellipsis
-end
-
-local function atx_heading(line)
-    local markers, title = line:match("^%s*(#+)%s+(.+)%s*$")
-
-    if not markers or #markers > 6 then
-        return nil
-    end
-
-    title = trim(title:gsub("%s+#+%s*$", ""))
-
-    if title == "" then
-        return nil
-    end
-
-    return #markers, title
-end
-
-local function setext_heading(title_line, underline_line)
-    if not underline_line then
-        return nil
-    end
-
-    local marker = underline_line:match("^%s*(=+)%s*$")
-
-    if marker then
-        marker = "="
-    else
-        marker = underline_line:match("^%s*(-+)%s*$") and "-"
-    end
-
-    if not marker then
-        return nil
-    end
-
-    local title = trim(title_line)
-
-    if title == "" then
-        return nil
-    end
-
-    return marker == "=" and 1 or 2, title
-end
-
-local function active_heading(winid)
-    if not valid_win(winid) then
-        return nil
-    end
-
-    local bufnr = vim.api.nvim_win_get_buf(winid)
-    local line_count = vim.api.nvim_buf_line_count(bufnr)
-    local topline = vim.api.nvim_win_call(winid, function()
-        return vim.fn.line("w0")
-    end)
-    local last_needed = math.min(line_count, topline + 1)
-    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, last_needed, false)
-
-    for index = math.min(topline, #lines), 1, -1 do
-        local level, title = atx_heading(lines[index])
-
-        if level then
-            return level, title
-        end
-
-        level, title = setext_heading(lines[index], lines[index + 1])
-
-        if level then
-            return level, title
-        end
-
-        if index > 1 then
-            level, title = setext_heading(lines[index - 1], lines[index])
-
-            if level then
-                return level, title
-            end
-        end
-    end
-
-    return nil
-end
-
+--- Build the winbar title for the active terminal pane.
 local function terminal_winbar_title()
     local ctx = M.active_terminal_key and M.terminals[M.active_terminal_key] or nil
 
@@ -699,6 +304,7 @@ local function terminal_winbar_title()
     return ctx.tool_label .. ": " .. ctx.preset_label .. " - " .. root_label(ctx.root)
 end
 
+--- Refresh the pane winbar for markdown heading or terminal identity.
 local function update_sticky_heading()
     if not valid_win(M.winid) then
         return
@@ -743,6 +349,7 @@ local function update_sticky_heading()
     vim.api.nvim_set_option_value("winbar", "%#WinBar# " .. statusline_escape(label) .. " %*", { win = M.winid })
 end
 
+--- Install autocmds that keep the sticky heading current.
 local function setup_sticky_heading_autocmds()
     vim.api.nvim_create_autocmd({ "WinScrolled", "WinResized", "BufWinEnter", "CursorMoved" }, {
         group = sticky_heading_group,
@@ -754,6 +361,7 @@ local function setup_sticky_heading_autocmds()
     })
 end
 
+--- Create or return the markdown viewer buffer.
 local function ensure_buf()
     if valid_buf(M.bufnr) then
         return M.bufnr
@@ -772,6 +380,7 @@ end
 local render_markview
 local setup_pane_maps
 
+--- Apply pane-local window options for markdown or terminal mode.
 local function set_window_options(winid, mode)
     mode = mode or M.active_mode
 
@@ -793,6 +402,7 @@ local function set_window_options(winid, mode)
     update_sticky_heading()
 end
 
+--- Re-render markview decorations for a markdown buffer.
 render_markview = function(bufnr)
     local ok, markview = pcall(require, "markview")
 
@@ -804,6 +414,7 @@ render_markview = function(bufnr)
     pcall(markview.render, bufnr, { enable = true, hybrid_mode = false })
 end
 
+--- Reflow the markdown pane buffer using configured internal or external formatting.
 local function reflow_pane_buffer(bufnr, opts)
     opts = opts or {}
     bufnr = bufnr or M.bufnr
@@ -836,6 +447,7 @@ local function reflow_pane_buffer(bufnr, opts)
     vim.api.nvim_set_option_value("modifiable", modifiable, { buf = bufnr })
 end
 
+--- Re-apply wrap settings and refresh markdown rendering if needed.
 local function apply_wrap_state()
     if not valid_win(M.winid) or not valid_buf(M.bufnr) then
         return
@@ -850,6 +462,7 @@ local function apply_wrap_state()
     end
 end
 
+--- Resolve the project root associated with a pane buffer.
 local function pane_root(bufnr)
     local terminal_ctx = terminal_context_for_buf(bufnr)
 
@@ -864,6 +477,7 @@ local function pane_root(bufnr)
     return project_root(bufnr)
 end
 
+--- Install pane-local mappings on a markdown or terminal pane buffer.
 setup_pane_maps = function(bufnr)
     local function map(mode, lhs, rhs, desc, opts)
         opts = opts or {}
@@ -935,6 +549,7 @@ setup_pane_maps = function(bufnr)
     end
 end
 
+--- Create or reuse the side pane window for a buffer and mode.
 local function ensure_win(bufnr, mode, opts)
     opts = opts or {}
     bufnr = bufnr or ensure_buf()
@@ -987,6 +602,7 @@ local function ensure_win(bufnr, mode, opts)
     return M.winid
 end
 
+--- Load markdown file contents into the pane buffer.
 local function load_file(path)
     local bufnr = ensure_buf()
     local ok, lines = pcall(vim.fn.readfile, path)
@@ -1016,11 +632,13 @@ local function load_file(path)
     return true
 end
 
+--- Toggle wrapping in the markdown viewer pane.
 function M.toggle_wrap()
     M.wrap_enabled = not preferred_wrap()
     apply_wrap_state()
 end
 
+--- Open a markdown file in the pane without stealing focus.
 function M.open(path)
     path = resolve_path(path) or default_path()
 
@@ -1065,6 +683,7 @@ function M.open(path)
     end
 end
 
+--- Switch the pane back to the markdown viewer.
 function M.show_markdown()
     if not valid_buf(M.bufnr) then
         M.open(M.source)
@@ -1104,6 +723,7 @@ function M.show_markdown()
     end
 end
 
+--- Close the pane window while preserving buffers and state.
 function M.close()
     if valid_win(M.winid) then
         if M.active_mode == "markdown" then
@@ -1116,6 +736,7 @@ function M.close()
     M.winid = nil
 end
 
+--- Toggle the pane, optionally opening a specific markdown file.
 function M.toggle(path)
     if path and path ~= "" then
         M.open(path)
@@ -1126,10 +747,12 @@ function M.toggle(path)
     end
 end
 
+--- Return whether the pane window is currently open.
 function M.is_open()
     return valid_win(M.winid)
 end
 
+--- Toggle focus between the pane and the last normal window.
 function M.focus_toggle()
     local current = vim.api.nvim_get_current_win()
 
@@ -1159,6 +782,7 @@ function M.focus_toggle()
     end
 end
 
+--- Toggle the pane between normal width and zoom width.
 function M.toggle_zoom()
     M.zoomed = not M.zoomed
 
@@ -1194,10 +818,12 @@ function M.toggle_zoom()
     vim.notify("Pane zoom " .. (M.zoomed and "on" or "off"), vim.log.levels.INFO)
 end
 
+--- Return the current text width used for markdown reflow.
 function M.text_width()
     return pane_text_width()
 end
 
+--- Merge user configuration and install pane autocmds.
 function M.setup(opts)
     M.config = vim.tbl_deep_extend("force", M.config, opts or {})
 
@@ -1220,6 +846,7 @@ function M.setup(opts)
     })
 end
 
+--- Resolve a configured preset by name, label, or default position.
 local function preset_by_name(tool, preset_name)
     local presets = tool.presets or {}
 
@@ -1236,6 +863,7 @@ local function preset_by_name(tool, preset_name)
     return presets[1] or { name = "default", label = "Default", args = {} }
 end
 
+--- Return configured tool names in stable picker order.
 local function ordered_tool_names()
     local tools = M.config.tools or {}
     local names = {}
@@ -1262,6 +890,7 @@ local function ordered_tool_names()
     return names
 end
 
+--- Build the quick x/c/i picker entry for a tool.
 local function current_or_default_entry(tool_name, root, key)
     local tool = (M.config.tools or {})[tool_name]
 
@@ -1286,6 +915,7 @@ local function current_or_default_entry(tool_name, root, key)
     }
 end
 
+--- Build quick picker entries for Codex, Claude, and optionally IPython.
 local function tool_shortcut_entries(root, opts)
     opts = opts or {}
 
@@ -1313,6 +943,7 @@ local function tool_shortcut_entries(root, opts)
     return entries
 end
 
+--- Build numbered picker entries for configured terminal presets.
 local function terminal_entries(root, start_index, opts)
     opts = opts or {}
 
@@ -1356,163 +987,7 @@ local function terminal_entries(root, start_index, opts)
     return entries
 end
 
-local function numbered_select(prompt, entries, callback)
-    if #entries == 0 then
-        return
-    end
-
-    local width = math.max(40, vim.fn.strdisplaywidth(prompt) + 4)
-    local lines = { prompt }
-    local active_lines = {}
-
-    for i, entry in ipairs(entries) do
-        local prefix = entry.current and "* " or "  "
-        local suffix = ""
-
-        if entry.current and entry.active then
-            suffix = "  [current session]"
-        elseif entry.current then
-            suffix = "  [current]"
-        elseif entry.running then
-            suffix = "  [session]"
-        end
-
-        local line = string.format("%s  %s%s%s", entry.key or tostring(entry.index), prefix, entry.label, suffix)
-
-        width = math.max(width, vim.fn.strdisplaywidth(line) + 4)
-        table.insert(lines, line)
-
-        if entry.current and not entry.shortcut then
-            table.insert(active_lines, #lines - 1)
-        end
-
-        if entry.shortcut and entries[i + 1] and not entries[i + 1].shortcut then
-            table.insert(lines, "")
-        end
-    end
-
-    width = math.min(width, math.max(40, vim.o.columns - 8))
-
-    local bufnr = vim.api.nvim_create_buf(false, true)
-    local height = #lines
-    local winid = vim.api.nvim_open_win(bufnr, true, {
-        relative = "editor",
-        row = math.max(0, math.floor((vim.o.lines - height) / 2) - 1),
-        col = math.max(0, math.floor((vim.o.columns - width) / 2)),
-        width = width,
-        height = height,
-        style = "minimal",
-        border = "single",
-    })
-
-    vim.api.nvim_set_option_value("bufhidden", "wipe", { buf = bufnr })
-    vim.api.nvim_set_option_value("modifiable", true, { buf = bufnr })
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
-    vim.api.nvim_set_option_value("modifiable", false, { buf = bufnr })
-    vim.api.nvim_set_option_value("filetype", "markdown", { buf = bufnr })
-    vim.api.nvim_buf_add_highlight(bufnr, -1, "Title", 0, 0, -1)
-
-    for _, line_index in ipairs(active_lines) do
-        vim.api.nvim_buf_add_highlight(bufnr, -1, "Search", line_index, 0, -1)
-    end
-
-    local function close()
-        if valid_win(winid) then
-            vim.api.nvim_win_close(winid, true)
-        end
-    end
-
-    local by_key = {}
-
-    for _, entry in ipairs(entries) do
-        by_key[entry.key or tostring(entry.index)] = entry
-    end
-
-    local function key_state(prefix)
-        local exact = by_key[prefix]
-        local has_prefix = false
-        local has_longer = false
-
-        for key in pairs(by_key) do
-            if vim.startswith(key, prefix) then
-                has_prefix = true
-
-                if #key > #prefix then
-                    has_longer = true
-                end
-            end
-        end
-
-        return exact, has_prefix, has_longer
-    end
-
-    local function read_choice()
-        local typed = ""
-
-        while true do
-            local char = vim.fn.getcharstr()
-
-            if char == "\27" or char == "q" then
-                return nil
-            end
-
-            typed = typed .. char
-
-            local exact, has_prefix, has_longer = key_state(typed)
-
-            if exact and not has_longer then
-                return exact
-            end
-
-            if exact and has_longer then
-                for _ = 1, 30 do
-                    local next_char = vim.fn.getcharstr(0)
-
-                    if next_char and next_char ~= "" then
-                        typed = typed .. next_char
-                        exact, has_prefix, has_longer = key_state(typed)
-
-                        if exact and not has_longer then
-                            return exact
-                        end
-
-                        break
-                    end
-
-                    vim.cmd("sleep 10m")
-                end
-
-                exact = key_state(typed)
-
-                if exact then
-                    return exact
-                end
-            end
-
-            if not has_prefix then
-                return nil
-            end
-        end
-    end
-
-    vim.cmd("redraw")
-
-    local choice
-
-    if M._test_next_choice then
-        choice = by_key[tostring(M._test_next_choice)]
-        M._test_next_choice = nil
-    else
-        choice = read_choice()
-    end
-
-    close()
-
-    if choice then
-        callback(choice)
-    end
-end
-
+--- Start a new pane-owned terminal job for a tool and project root.
 local function start_terminal(tool_name, preset_name, root)
     local tool = (M.config.tools or {})[tool_name]
 
@@ -1579,6 +1054,7 @@ local function start_terminal(tool_name, preset_name, root)
     return ctx, true
 end
 
+--- Open or focus a pane terminal, reusing an existing session when possible.
 function M.open_terminal(tool_name, preset_name, opts)
     opts = opts or {}
 
@@ -1618,6 +1094,7 @@ function M.open_terminal(tool_name, preset_name, opts)
     return ctx, started
 end
 
+--- Show the most recently used coding-agent terminal.
 function M.show_last_agent(opts)
     opts = opts or {}
 
@@ -1641,6 +1118,7 @@ function M.show_last_agent(opts)
     })
 end
 
+--- Toggle between markdown view and the last coding-agent terminal.
 function M.toggle_markdown_agent()
     if M.active_mode == "markdown" then
         M.show_last_agent({ focus = true })
@@ -1649,6 +1127,7 @@ function M.toggle_markdown_agent()
     end
 end
 
+--- Switch the pane to markdown or a selected terminal entry.
 function M.switch(entry)
     if entry == "markdown" or (type(entry) == "table" and entry.kind == "markdown") then
         M.show_markdown()
@@ -1665,6 +1144,7 @@ function M.switch(entry)
     end
 end
 
+--- Show the pane switcher picker.
 function M.switch_picker()
     local bufnr = vim.api.nvim_get_current_buf()
     local terminal_ctx = terminal_context_for_buf(bufnr)
@@ -1688,145 +1168,19 @@ function M.switch_picker()
     end)
 end
 
-local function selection_from_visual(bufnr, opts)
-    opts = opts or {}
-
-    local visual_mode = opts.visual_mode or vim.fn.mode(1)
-    local in_active_visual = visual_mode:match("[vV\22]") ~= nil
-    local start_pos = in_active_visual and vim.fn.getpos("v") or vim.fn.getpos("'<")
-    local end_pos = in_active_visual and vim.fn.getcurpos() or vim.fn.getpos("'>")
-
-    local start_lnum = start_pos[2]
-    local start_col = start_pos[3]
-    local end_lnum = end_pos[2]
-    local end_col = end_pos[3]
-
-    if start_lnum == 0 or end_lnum == 0 then
-        return nil
-    end
-
-    if start_lnum > end_lnum or (start_lnum == end_lnum and start_col > end_col) then
-        start_lnum, end_lnum = end_lnum, start_lnum
-        start_col, end_col = end_col, start_col
-    end
-
-    local lines = nil
-
-    if visual_mode:sub(1, 1) == "V" then
-        lines = vim.api.nvim_buf_get_lines(bufnr, start_lnum - 1, end_lnum, false)
-    else
-        lines = vim.api.nvim_buf_get_text(bufnr, start_lnum - 1, start_col - 1, end_lnum - 1, end_col, {})
-    end
-
-    return {
-        text = table.concat(lines, "\n"),
-        start_lnum = start_lnum,
-        end_lnum = end_lnum,
-    }
-end
-
-local function selection_from_range(bufnr, line1, line2)
-    line1 = line1 or vim.fn.line(".")
-    line2 = line2 or line1
-
-    if line1 > line2 then
-        line1, line2 = line2, line1
-    end
-
-    local lines = vim.api.nvim_buf_get_lines(bufnr, line1 - 1, line2, false)
-
-    return {
-        text = table.concat(lines, "\n"),
-        start_lnum = line1,
-        end_lnum = line2,
-    }
-end
-
-local function markdown_fence_language(bufnr, line)
-    local lines = vim.api.nvim_buf_get_lines(bufnr, 0, line, false)
-    local open_fence = nil
-    local language = nil
-
-    for index = 1, #lines do
-        local marker, info = lines[index]:match("^%s*(```+)%s*(.-)%s*$")
-
-        if not marker then
-            marker, info = lines[index]:match("^%s*(~~~+)%s*(.-)%s*$")
-        end
-
-        if marker then
-            if open_fence and marker:sub(1, 1) == open_fence:sub(1, 1) and #marker >= #open_fence then
-                open_fence = nil
-                language = nil
-            else
-                open_fence = marker
-                info = trim(info or "")
-
-                if info ~= "" then
-                    language = info:match("^([^%s,{]+)")
-                else
-                    language = nil
-                end
-            end
-        end
-    end
-
-    return open_fence and language or nil
-end
-
+--- Capture text, file, root, and snippet language for a send/ask action.
 local function selection_context(opts)
-    opts = opts or {}
-
-    local bufnr = opts.bufnr or vim.api.nvim_get_current_buf()
-    local selection = opts.visual and selection_from_visual(bufnr, opts) or selection_from_range(bufnr, opts.line1, opts.line2)
-
-    if not selection or selection.text == "" then
-        vim.notify("No selection to send", vim.log.levels.WARN)
-        return nil
-    end
-
-    local terminal_ctx = terminal_context_for_buf(bufnr)
-    local markdown_source = bufnr == M.bufnr and M.source or nil
-    local root = terminal_ctx and terminal_ctx.root or (markdown_source and project_root_for_path(markdown_source) or project_root(bufnr))
-    local path = markdown_source or vim.api.nvim_buf_get_name(bufnr)
-
-    selection.bufnr = bufnr
-    selection.root = root
-    selection.file = terminal_ctx and ("Terminal: " .. terminal_ctx.tool_label .. " / " .. terminal_ctx.preset_label) or relative_path(path, root)
-    selection.filetype = vim.api.nvim_get_option_value("filetype", { buf = bufnr })
-    selection.snippet_filetype = selection.filetype
-
-    if selection.filetype == "markdown" then
-        selection.snippet_filetype = markdown_fence_language(bufnr, selection.start_lnum) or selection.filetype
-    end
-
-    return selection
+    return selection.context(opts, {
+        pane_bufnr = M.bufnr,
+        source = M.source,
+        terminal_context_for_buf = terminal_context_for_buf,
+    })
 end
 
-local function format_prompt(context, question)
-    local filetype = context.snippet_filetype ~= "" and context.snippet_filetype or nil
-    local fence = fence_for(context.text)
+local format_prompt = selection.format_prompt
+local prompt_template = selection.prompt_template
 
-    return table.concat({
-        "Question:",
-        question,
-        "",
-        "File:",
-        context.file,
-        "",
-        "Selection:",
-        "lines " .. context.start_lnum .. "-" .. context.end_lnum,
-        "",
-        fence .. (filetype and filetype or ""),
-        context.text,
-        fence,
-    }, "\n")
-end
-
-local function prompt_template(context)
-    return format_prompt(context, "")
-end
-
+--- Format the in-terminal command that switches a running tool preset.
 local function format_switch_command(tool, preset)
     if not tool or not preset then
         return nil
@@ -1855,6 +1209,7 @@ local function format_switch_command(tool, preset)
     end):gsub("%s+", " "):gsub("^%s+", ""):gsub("%s+$", ""))
 end
 
+--- Send text to a terminal job using bracketed paste.
 local function send_to_terminal(ctx, prompt, started)
     local delay = started and ctx.send_delay_ms or 50
 
@@ -1868,6 +1223,7 @@ local function send_to_terminal(ctx, prompt, started)
     end, delay)
 end
 
+--- Send an ask prompt, switching model first when needed.
 local function send_prompt_to_terminal(ctx, entry, prompt, started)
     local tool = (M.config.tools or {})[ctx.tool_name]
     local preset = tool and preset_by_name(tool, entry and entry.preset_name or ctx.preset_name) or ctx.preset
@@ -1902,12 +1258,14 @@ local function send_prompt_to_terminal(ctx, entry, prompt, started)
     end
 end
 
+--- Resolve the project root used for IPython operations.
 local function ipython_root(opts)
     opts = opts or {}
 
     return opts.root or pane_root(opts.bufnr or vim.api.nvim_get_current_buf())
 end
 
+--- Open or focus the IPython pane terminal.
 function M.open_ipython(opts)
     opts = opts or {}
 
@@ -1918,6 +1276,7 @@ function M.open_ipython(opts)
     })
 end
 
+--- Send the current line or selection to IPython.
 function M.send_ipython(opts)
     opts = opts or {}
 
@@ -1938,6 +1297,7 @@ function M.send_ipython(opts)
     end
 end
 
+--- Clear the running IPython terminal screen.
 function M.clear_ipython(opts)
     opts = opts or {}
 
@@ -1952,6 +1312,7 @@ function M.clear_ipython(opts)
     vim.fn.chansend(ctx.job_id, "\12")
 end
 
+--- Restart the IPython pane terminal for the current root.
 function M.restart_ipython(opts)
     opts = opts or {}
 
@@ -1978,6 +1339,7 @@ function M.restart_ipython(opts)
     })
 end
 
+--- Resolve the polite shutdown command for a terminal context.
 local function terminal_shutdown_command(ctx)
     local tool = (M.config.tools or {})[ctx.tool_name]
 
@@ -1994,12 +1356,14 @@ local function terminal_shutdown_command(ctx)
     return command
 end
 
+--- Resolve the shutdown timeout for a terminal context.
 local function terminal_shutdown_timeout(ctx, opts)
     local tool = (M.config.tools or {})[ctx.tool_name] or {}
 
     return opts.timeout_ms or tool.shutdown_timeout_ms or M.config.shutdown_timeout_ms or 300
 end
 
+--- Gracefully stop one terminal, then force-stop if needed.
 local function shutdown_terminal(ctx, opts)
     opts = opts or {}
 
@@ -2025,6 +1389,7 @@ local function shutdown_terminal(ctx, opts)
     end
 end
 
+--- Shut down all pane-owned terminal sessions.
 function M.shutdown_terminals(opts)
     opts = opts or {}
 
@@ -2037,6 +1402,7 @@ function M.shutdown_terminals(opts)
     end
 end
 
+--- Capture enough pane/window state to restore after question editing.
 local function capture_origin()
     local winid = vim.api.nvim_get_current_win()
     local bufnr = vim.api.nvim_get_current_buf()
@@ -2061,6 +1427,7 @@ local function capture_origin()
     }
 end
 
+--- Restore focus and pane state after closing a question editor.
 local function restore_origin(origin)
     if not origin or not valid_win(origin.winid) then
         return
@@ -2095,6 +1462,7 @@ local function restore_origin(origin)
     end
 end
 
+--- Open the editable ask prompt scratch buffer.
 local function open_question_buffer(entry, context, origin)
     origin = origin or capture_origin()
 
@@ -2329,6 +1697,7 @@ local function open_question_buffer(entry, context, origin)
     vim.cmd("startinsert")
 end
 
+--- Cancel and close a question editor buffer.
 function M.cancel_question(bufnr)
     bufnr = bufnr or vim.api.nvim_get_current_buf()
 
@@ -2339,6 +1708,7 @@ function M.cancel_question(bufnr)
     end
 end
 
+--- Finish a question editor, sending only after a write.
 function M.finish_question(bufnr)
     bufnr = bufnr or vim.api.nvim_get_current_buf()
 
@@ -2349,6 +1719,7 @@ function M.finish_question(bufnr)
     end
 end
 
+--- Mark a question editor as written and update its cached prompt.
 function M.write_question(bufnr)
     bufnr = bufnr or vim.api.nvim_get_current_buf()
 
@@ -2359,6 +1730,7 @@ function M.write_question(bufnr)
     end
 end
 
+--- Open the target picker from inside a question editor.
 function M.change_question_target(bufnr)
     bufnr = bufnr or vim.api.nvim_get_current_buf()
 
@@ -2369,6 +1741,7 @@ function M.change_question_target(bufnr)
     end
 end
 
+--- Open the ask target picker for an already-captured context.
 local function open_ask_target_picker(context, origin)
     local entries = tool_shortcut_entries(context.root, { ask_only = true })
 
@@ -2381,6 +1754,7 @@ local function open_ask_target_picker(context, origin)
     end)
 end
 
+--- Ask a specific picker entry using a captured or fresh context.
 function M.ask_with_entry(entry, opts)
     opts = opts or {}
 
@@ -2397,6 +1771,7 @@ function M.ask_with_entry(entry, opts)
     open_question_buffer(entry, context, opts.origin)
 end
 
+--- Capture selection and ask via the target picker.
 function M.ask_picker(opts)
     opts = opts or {}
 
@@ -2410,6 +1785,7 @@ function M.ask_picker(opts)
     open_ask_target_picker(context, origin)
 end
 
+--- Ask the most recently used Codex or Claude terminal.
 function M.ask_last_coding_agent(opts)
     opts = opts or {}
 
@@ -2430,6 +1806,7 @@ function M.ask_last_coding_agent(opts)
     M.ask_with_entry(entry_for_terminal_context(ctx), { context = context, origin = origin })
 end
 
+--- Ask the current/default terminal for a specific coding agent.
 function M.ask_current_coding_agent(tool_name, opts)
     opts = opts or {}
 
@@ -2455,6 +1832,7 @@ function M.ask_current_coding_agent(tool_name, opts)
     M.ask_with_entry(entry_for_terminal_context(ctx), { context = context, origin = origin })
 end
 
+--- Ask a specific tool and optional preset.
 function M.ask(tool_name, preset_name, opts)
     opts = opts or {}
 
@@ -2475,6 +1853,7 @@ function M.ask(tool_name, preset_name, opts)
     }, opts)
 end
 
+--- Pick a markdown document and open it in the pane.
 function M.pick()
     local pickers = require("telescope.pickers")
     local finders = require("telescope.finders")
