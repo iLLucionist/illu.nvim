@@ -1,5 +1,7 @@
 vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
 
+local defaults = require("markdown_pane.defaults")
+local entries = require("markdown_pane.entries")
 local pane = require("markdown_pane")
 
 local tests = {}
@@ -26,9 +28,62 @@ local function has_map(bufnr, lhs)
     return false
 end
 
+local function find_map(bufnr, lhs)
+    for _, map in ipairs(vim.api.nvim_buf_get_keymap(bufnr, "n")) do
+        if map.lhs == lhs then
+            return map
+        end
+    end
+
+    error("missing map: " .. lhs)
+end
+
+local function call_map(bufnr, lhs)
+    local map = find_map(bufnr, lhs)
+
+    assert(map.callback, lhs .. " has no callback")
+    map.callback()
+end
+
+local function only_question_buf()
+    local found = nil
+
+    for bufnr in pairs(pane.question_buffers or {}) do
+        assert(not found, "more than one question buffer is open")
+        found = bufnr
+    end
+
+    assert(found, "no question buffer is open")
+
+    return found
+end
+
+local function set_question(bufnr, lines)
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+    vim.api.nvim_set_option_value("modified", true, { buf = bufnr })
+end
+
+local function read_file(path)
+    if vim.fn.filereadable(path) == 0 then
+        return ""
+    end
+
+    return table.concat(vim.fn.readfile(path), "\n")
+end
+
+local function wait_for_file(path, needle)
+    local ok = vim.wait(1500, function()
+        return read_file(path):find(needle, 1, true) ~= nil
+    end, 20)
+
+    assert(ok, "did not find " .. needle .. " in " .. path .. ":\n" .. read_file(path))
+end
+
 local function reset_pane()
     pane.shutdown_terminals({ timeout_ms = 50 })
     pane.close()
+    pane.zoomed = false
+    pane.config = vim.deepcopy(defaults.config)
 end
 
 local function root_fixture(name)
@@ -69,6 +124,56 @@ test("pane-local slot maps exist on markdown and terminal panes", function()
     for _, lhs in ipairs({ " 0", " x", " c", " i" }) do
         assert(has_map(ctx.bufnr, lhs), lhs .. " missing on terminal pane")
     end
+end)
+
+test("pane-local slot maps switch between markdown, agents, and IPython", function()
+    reset_pane()
+
+    local root = root_fixture("pane-slot-switch-test")
+    write(root .. "/docs/doc.md", { "# Doc" })
+
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+            claude = {
+                label = "Claude",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+            ipython = {
+                label = "IPython",
+                ask = false,
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    pane.open(root .. "/docs/doc.md")
+    pane.focus_toggle()
+
+    call_map(pane.bufnr, " x")
+    assert(pane.active_mode == "codex", "space-x did not switch to Codex")
+
+    local codex_buf = vim.api.nvim_win_get_buf(pane.winid)
+
+    call_map(codex_buf, " c")
+    assert(pane.active_mode == "claude", "space-c did not switch to Claude")
+
+    local claude_buf = vim.api.nvim_win_get_buf(pane.winid)
+
+    call_map(claude_buf, " i")
+    assert(pane.active_mode == "ipython", "space-i did not switch to IPython")
+
+    local ipython_buf = vim.api.nvim_win_get_buf(pane.winid)
+
+    call_map(ipython_buf, " 0")
+    assert(pane.active_mode == "markdown", "space-0 did not switch to markdown")
+    assert(vim.api.nvim_win_get_buf(pane.winid) == pane.bufnr, "space-0 did not restore markdown buffer")
 end)
 
 test("visual-line ask captures all selected lines", function()
@@ -120,6 +225,138 @@ test("visual-line ask captures all selected lines", function()
     assert(captured:find("assert Value%(1%)%.value==1 and Binding"), captured)
 end)
 
+test("question quit cancels unwritten changes and restores origin", function()
+    reset_pane()
+
+    local root = root_fixture("question-cancel-test")
+    local out = "/private/tmp/illu-question-cancel.txt"
+
+    pcall(vim.fn.delete, out)
+    write(root .. "/src/origin.py", { "print('origin')" })
+
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "tee -a " .. out },
+                send_delay_ms = 0,
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    vim.cmd.edit(root .. "/src/origin.py")
+
+    local origin_win = vim.api.nvim_get_current_win()
+    local origin_buf = vim.api.nvim_get_current_buf()
+
+    pane.ask("codex", nil, { bufnr = origin_buf })
+
+    local qbuf = only_question_buf()
+
+    set_question(qbuf, { "Question:", "this should not send" })
+    pane.finish_question(qbuf)
+
+    assert(next(pane.question_buffers) == nil, "question buffer was not cleared")
+    assert(next(pane.terminals) == nil, "cancelled question started a terminal")
+    assert(vim.api.nvim_get_current_win() == origin_win, "cancel did not restore origin window")
+    assert(vim.api.nvim_get_current_buf() == origin_buf, "cancel did not restore origin buffer")
+    assert(read_file(out) == "", "cancelled question wrote to terminal")
+end)
+
+test("question write then quit sends prompt and focuses terminal", function()
+    reset_pane()
+
+    local root = root_fixture("question-send-test")
+    local out = "/private/tmp/illu-question-send.txt"
+
+    pcall(vim.fn.delete, out)
+    write(root .. "/src/origin.py", { "print('origin')" })
+
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "tee -a " .. out },
+                send_delay_ms = 0,
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    vim.cmd.edit(root .. "/src/origin.py")
+    pane.ask("codex", nil, { bufnr = vim.api.nvim_get_current_buf() })
+
+    local qbuf = only_question_buf()
+
+    set_question(qbuf, { "Question:", "send this exact prompt" })
+    pane.write_question(qbuf)
+    pane.finish_question(qbuf)
+
+    wait_for_file(out, "send this exact prompt")
+    assert(next(pane.question_buffers) == nil, "sent question buffer was not cleared")
+    assert(vim.api.nvim_get_current_win() == pane.winid, "send did not focus the pane terminal")
+    assert(pane.active_mode == "codex", "send did not activate Codex")
+end)
+
+test("asking with a new preset reuses the same agent session and sends a model switch", function()
+    reset_pane()
+
+    local root = root_fixture("model-switch-test")
+    local out = "/private/tmp/illu-model-switch.txt"
+
+    pcall(vim.fn.delete, out)
+    write(root .. "/src/origin.py", { "print('origin')" })
+
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "tee -a " .. out },
+                send_delay_ms = 0,
+                switch_command = "SWITCH {name}",
+                presets = {
+                    { name = "one", label = "One", args = {} },
+                    { name = "two", label = "Two", args = {} },
+                },
+            },
+        },
+    })
+
+    local ctx = pane.open_terminal("codex", "one", { root = root, focus = false })
+    local original_buf = ctx.bufnr
+    local original_job = ctx.job_id
+
+    vim.cmd.edit(root .. "/src/origin.py")
+    pane.ask("codex", "two", { bufnr = vim.api.nvim_get_current_buf() })
+
+    local qbuf = only_question_buf()
+
+    set_question(qbuf, { "Question:", "reuse this session" })
+    pane.write_question(qbuf)
+    pane.finish_question(qbuf)
+
+    wait_for_file(out, "SWITCH two")
+    wait_for_file(out, "reuse this session")
+
+    local updated = pane.terminals[ctx.key]
+
+    assert(updated.bufnr == original_buf, "Codex buffer was replaced")
+    assert(updated.job_id == original_job, "Codex job was replaced")
+    assert(updated.preset_name == "two", "Codex preset was not updated")
+
+    local current = {}
+
+    for _, entry in ipairs(entries.terminal_entries(pane, root, 1, { ask_only = true })) do
+        if entry.tool_name == "codex" and entry.current then
+            table.insert(current, entry)
+        end
+    end
+
+    assert(#current == 1, "model picker marked multiple Codex presets current")
+    assert(current[1].preset_name == "two", "model picker current preset did not follow switch")
+end)
+
 test("smart gf from markdown pane opens in last non-pane window", function()
     reset_pane()
 
@@ -143,6 +380,37 @@ test("smart gf from markdown pane opens in last non-pane window", function()
     assert(vim.api.nvim_get_current_win() == origin_win, "gf did not return to origin window")
     assert(vim.api.nvim_buf_get_name(0) == root .. "/src/ir.py", "gf opened wrong buffer")
     assert(vim.api.nvim_win_get_buf(pane.winid) == pane.bufnr, "pane buffer was replaced")
+end)
+
+test("zoom focuses pane and caps markdown text width", function()
+    reset_pane()
+
+    local root = root_fixture("zoom-focus-test")
+
+    write(root .. "/docs/doc.md", {
+        "# Doc",
+        "",
+        "This is a paragraph that exists so zoom reflow has content to work with in the pane.",
+    })
+    write(root .. "/src/origin.py", { "print('origin')" })
+
+    pane.setup({
+        width = 40,
+        zoom_text_width = 90,
+        reflow_margin = 8,
+    })
+
+    vim.cmd.edit(root .. "/src/origin.py")
+
+    local origin_win = vim.api.nvim_get_current_win()
+
+    pane.open(root .. "/docs/doc.md")
+    assert(vim.api.nvim_get_current_win() == origin_win, "pane open stole focus before zoom")
+
+    pane.toggle_zoom()
+
+    assert(vim.api.nvim_get_current_win() == pane.winid, "zoom did not focus pane")
+    assert(pane.text_width() <= 90, "zoom text width exceeded cap")
 end)
 
 test("smart gf from IPython pane opens traceback file and line outside pane", function()
