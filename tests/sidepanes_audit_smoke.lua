@@ -141,6 +141,7 @@ local pane_config = sidepanes.get_config()
 
 assert(pane_config.width == 100, "configured pane width changed")
 assert(pane_config.zoom_text_width == 90, "configured zoom text width changed")
+assert(pane_config.sticky_relative_width == false, "configured sticky relative width changed")
 assert(pane_config.external_reflow_cmd[1] == "mdfmt", "configured external reflow command changed")
 assert(#pane_config.tools.codex.presets == 12, "configured Codex preset count changed")
 assert(pane_config.tools.codex.presets[1].name == "gpt55_high_fast", "configured Codex default changed")

@@ -16,6 +16,7 @@ M.config = {
     external_reflow_protect_tables = true,
     reflow_margin = 8,
     zoom_text_width = 90,
+    sticky_relative_width = false,
     sticky_heading = true,
     wrap_toggle_key = "<leader>mw",
     focus_on_switch = true,

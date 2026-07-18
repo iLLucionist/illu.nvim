@@ -184,11 +184,33 @@ function M.clamp_width(width)
     return math.max(20, math.min(math.floor(width), M.max_width()))
 end
 
+--- Return a normalized relative width spec from a ratio.
+function M.relative_width_spec(ratio, label)
+    if not ratio or ratio <= 0 then
+        return nil
+    end
+
+    return {
+        kind = "ratio",
+        ratio = ratio,
+        label = label or tostring(ratio),
+    }
+end
+
+--- Resolve a relative width spec against the current Neovim columns.
+function M.width_from_spec(spec)
+    if type(spec) ~= "table" or spec.kind ~= "ratio" or not spec.ratio then
+        return nil
+    end
+
+    return M.clamp_width(vim.o.columns * spec.ratio)
+end
+
 --- Resolve a user width value into columns.
 function M.resolve_width(value, current_width)
     if type(value) == "number" then
         if value > 0 and value < 1 then
-            return M.clamp_width(vim.o.columns * value)
+            return M.clamp_width(vim.o.columns * value), nil, M.relative_width_spec(value)
         end
 
         if value >= 1 then
@@ -222,7 +244,9 @@ function M.resolve_width(value, current_width)
             return nil, "Percentage width must be positive"
         end
 
-        return M.clamp_width(vim.o.columns * percent / 100)
+        local ratio = percent / 100
+
+        return M.clamp_width(vim.o.columns * ratio), nil, M.relative_width_spec(ratio, text)
     end
 
     local numerator, denominator = text:match("^(%d+%.?%d*)/(%d+%.?%d*)$")
@@ -235,7 +259,9 @@ function M.resolve_width(value, current_width)
             return nil, "Fraction width must be positive"
         end
 
-        return M.clamp_width(vim.o.columns * numerator / denominator)
+        local ratio = numerator / denominator
+
+        return M.clamp_width(vim.o.columns * ratio), nil, M.relative_width_spec(ratio, text)
     end
 
     local numeric = tonumber(text)

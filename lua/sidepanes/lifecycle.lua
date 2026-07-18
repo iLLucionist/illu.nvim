@@ -12,7 +12,24 @@ local M = {}
 
 --- Merge user configuration and install pane lifecycle autocmds.
 function M.setup(state, groups, deps, opts)
-    state.config = config.normalize(state.config, opts or {})
+    local normalized, metadata = config.normalize(state.config, opts or {})
+
+    state.config = normalized
+
+    if metadata.width.error then
+        vim.notify("Invalid Sidepanes width: " .. metadata.width.error, vim.log.levels.WARN)
+    end
+
+    if metadata.width.configured then
+        if state.config.sticky_relative_width and metadata.width.relative_width then
+            state.relative_width = metadata.width.relative_width
+        else
+            state.relative_width = nil
+        end
+    elseif not state.config.sticky_relative_width then
+        state.relative_width = nil
+    end
+
     validation.notify(state.config)
 
     vim.api.nvim_clear_autocmds({ group = groups.focus })
@@ -22,6 +39,16 @@ function M.setup(state, groups, deps, opts)
             deps.record_focus_win()
         end,
     })
+
+    if groups.resize and deps.refresh_width then
+        vim.api.nvim_clear_autocmds({ group = groups.resize })
+        vim.api.nvim_create_autocmd("VimResized", {
+            group = groups.resize,
+            callback = function()
+                deps.refresh_width()
+            end,
+        })
+    end
 
     vim.api.nvim_clear_autocmds({ group = groups.shutdown })
     vim.api.nvim_create_autocmd("VimLeavePre", {

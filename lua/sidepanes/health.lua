@@ -43,6 +43,7 @@ local expected_global_mappings = {
     clear_ipython = "n",
     focus = "n",
     zoom = "n",
+    sticky_relative_width = "n",
     switch = "n",
     ask = "x",
     ask_last = "x",

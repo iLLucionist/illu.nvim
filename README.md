@@ -10,6 +10,7 @@ require("sidepanes").setup({
   layout = {
     width = 100,
     zoom_text_width = 90,
+    sticky_relative_width = false,
   },
   markdown = {
     wrap = false,
@@ -54,6 +55,7 @@ require("sidepanes").setup({
       ipython = "<leader>pi",
       focus = "<leader>pf",
       zoom = "<leader>pz",
+      sticky_relative_width = "<leader>p%",
       send_ipython = "<leader>pl",
       ask = "<leader>pa",
     },
@@ -80,6 +82,7 @@ Grouped options normalize to these runtime keys:
 
 - `layout.width` -> `width`
 - `layout.zoom_text_width` -> `zoom_text_width`
+- `layout.sticky_relative_width` -> `sticky_relative_width`
 - `markdown.wrap` -> `wrap`
 - `markdown.wrap_toggle_key` -> `wrap_toggle_key`
 - `markdown.sticky_heading` -> `sticky_heading`
@@ -107,7 +110,7 @@ Stable public calls include:
 - `setup(opts)`, `get_config()`
 - `open(path)`, `toggle(path)`, `close()`, `is_open()`
 - `focus_toggle()`, `toggle_zoom()`, `show_markdown()`
-- `get_width()`, `set_width(value)`, `adjust_width(delta)`, `text_width()`, `toggle_wrap()`
+- `get_width()`, `set_width(value)`, `adjust_width(delta)`, `toggle_sticky_relative_width(enabled)`, `text_width()`, `toggle_wrap()`
 - `pick()`, `pick_headings()`, `switch_picker()`
 - `switch_to(target, opts)`, `make_switch_entry(target, opts)`
 - `open_terminal(tool_name, preset_name, opts)`
@@ -154,11 +157,16 @@ Pane width can be adjusted at runtime:
 require("sidepanes").set_width(100)    -- columns
 require("sidepanes").set_width("50%")  -- percentage of editor columns
 require("sidepanes").set_width("1/2")  -- screen fraction
+require("sidepanes").set_width(0.5)    -- numeric screen ratio
 require("sidepanes").adjust_width(10)  -- add columns
 require("sidepanes").adjust_width(-10) -- subtract columns
 ```
 
+`layout.width` accepts the same absolute and relative width values during setup. The built-in default remains `100` columns.
+
 When the Markdown viewer is active, width changes preserve the viewer cursor/scroll position and reflow/rerender Markdown if automatic reflow is enabled. Terminal panes are resized without Markdown reflow. Zoom still represents a temporary maximum-width mode; `set_width()` changes the normal pane width.
+
+Set `layout.sticky_relative_width = true` to keep relative width choices tied to the total Neovim width. With that enabled, `layout.width = "50%"`, `set_width("50%")`, `set_width("1/2")`, and `set_width(0.5)` remember their ratio and recompute when Neovim is resized. Absolute column widths and `adjust_width()` clear the sticky relative target. `toggle_sticky_relative_width()` toggles this behavior at runtime and captures the current normal pane width as the relative target when enabling it.
 
 `_state()` is reserved for Sidepanes companion modules and tests. Treat it as internal and unstable.
 

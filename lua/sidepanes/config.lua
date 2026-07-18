@@ -6,6 +6,7 @@ Architecture: Forms the boundary between public setup() input and the state.conf
 ]]
 
 local defaults = require("sidepanes.defaults")
+local api = require("sidepanes.api")
 local presets = require("sidepanes.presets")
 
 local M = {}
@@ -24,6 +25,7 @@ local function expand_layout(opts)
 
     set_if_present(expanded, "width", layout.width)
     set_if_present(expanded, "zoom_text_width", layout.zoom_text_width)
+    set_if_present(expanded, "sticky_relative_width", layout.sticky_relative_width)
     expanded.layout = nil
 
     return expanded
@@ -110,6 +112,53 @@ local function remove_disabled_tools(config, opts)
     end
 end
 
+--- Resolve setup-time width values to columns and return relative metadata.
+local function resolve_setup_width(value, current_width)
+    if type(value) == "number" and value >= 1 then
+        return math.floor(value)
+    end
+
+    if type(value) == "string" then
+        local text = value:match("^%s*(.-)%s*$")
+        local numeric = tonumber(text)
+
+        if numeric and numeric >= 1 then
+            return math.floor(numeric)
+        end
+    end
+
+    return api.resolve_width(value, current_width)
+end
+
+--- Normalize config width while preserving literal absolute column values.
+local function normalize_width(config, base, expanded)
+    local current_width = tonumber((base or {}).width) or defaults.config.width
+
+    if config.width == nil then
+        config.width = current_width
+
+        return {
+            configured = false,
+            error = nil,
+            relative_width = nil,
+        }
+    end
+
+    local width, err, relative_width = resolve_setup_width(config.width, current_width)
+
+    if width then
+        config.width = width
+    else
+        config.width = current_width
+    end
+
+    return {
+        configured = expanded.width ~= nil,
+        error = err,
+        relative_width = relative_width,
+    }
+end
+
 --- Return a canonical grouped setup table for an already-normalized runtime config.
 function M.to_setup(runtime_config)
     local config = vim.deepcopy(runtime_config or defaults.config)
@@ -118,6 +167,7 @@ function M.to_setup(runtime_config)
         layout = {
             width = config.width,
             zoom_text_width = config.zoom_text_width,
+            sticky_relative_width = config.sticky_relative_width,
         },
         markdown = {
             wrap = config.wrap,
@@ -155,10 +205,13 @@ end
 function M.normalize(base, opts)
     local expanded = M.expand(opts or {})
     local result = vim.tbl_deep_extend("force", vim.deepcopy(base or {}), expanded)
+    local metadata = {
+        width = normalize_width(result, base, expanded),
+    }
 
     remove_disabled_tools(result, opts)
 
-    return result
+    return result, metadata
 end
 
 --- Return the plugin defaults using the canonical grouped setup shape.

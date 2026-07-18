@@ -93,6 +93,10 @@ function M.setup(api, mappings)
         api.toggle_zoom()
     end, "Toggle sidepanes zoom")
 
+    map("n", mappings.sticky_relative_width, function()
+        api.toggle_sticky_relative_width()
+    end, "Toggle sidepanes sticky relative width")
+
     map("n", mappings.switch, function()
         api.switch_picker()
     end, "Switch sidepanes")

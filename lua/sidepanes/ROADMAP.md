@@ -26,14 +26,21 @@ Recently completed or in progress:
 - `show_last_agent(opts)` and `toggle_markdown_agent()` are documented as advanced workflow helpers.
 - Runtime width API exists through `get_width()`, `set_width(value)`, and `adjust_width(delta)`.
 - Width commands exist through `:SidepanesWidth` and `:Sidepanes width`.
-- Width values support columns, percentages, screen fractions, and deltas.
+- Width values support columns, percentages, screen fractions, numeric ratios, and deltas.
 - Width changes reflow Markdown when the Markdown viewer is active and avoid Markdown reflow while a terminal pane is active.
+- `layout.sticky_relative_width` can keep percentage/fraction widths tied to the total Neovim width.
+- `layout.width` accepts the same width units during setup.
+- `toggle_sticky_relative_width()` and `<leader>p%` toggle sticky relative width at runtime.
 
 ## Roadmap
 
 ### 1. Commit Current API And Width Pass
 
+Status: ready to commit.
+
 Commit the current public API, switch target, width command, documentation, and regression coverage work.
+
+This now includes setup-time width units, sticky relative width, and the `<leader>p%` sticky toggle.
 
 Acceptance:
 
@@ -72,6 +79,8 @@ Completed refinement:
 
 ### 3. Command And Mapping Polish
 
+Status: in progress.
+
 Decide whether width changes deserve default mappings or should remain command/API-only.
 
 Possible mappings:
@@ -83,6 +92,9 @@ Possible mappings:
 Current leaning:
 
 - Keep `:SidepanesWidth` as the primary interface unless repeated manual resizing becomes common.
+- Keep `<leader>p%` as the quick toggle for sticky relative width.
+- Width next/previous mappings should snap to meaningful boundaries instead of adding raw columns.
+- Snapping should understand fractions/percentages and cooperate with `layout.sticky_relative_width`.
 
 ### 4. Docs Split
 

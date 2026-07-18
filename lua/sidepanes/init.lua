@@ -42,6 +42,7 @@ local M = {
     bufnr = nil,
     source = nil,
     wrap_enabled = nil,
+    relative_width = nil,
     active_mode = "markdown",
     active_terminal_key = nil,
     last_terminal_key = nil,
@@ -64,6 +65,7 @@ local M = {
 local sticky_heading_group = vim.api.nvim_create_augroup("SidepanesStickyHeading", { clear = true })
 local focus_group = vim.api.nvim_create_augroup("SidepanesFocus", { clear = true })
 local shutdown_group = vim.api.nvim_create_augroup("SidepanesShutdown", { clear = true })
+local resize_group = vim.api.nvim_create_augroup("SidepanesResize", { clear = true })
 
 
 -- =============================================================================
@@ -348,14 +350,21 @@ function M.text_width()
     return pane_text_width()
 end
 
---- Return the configured normal pane width in columns.
+--- Return the effective normal pane width in columns.
 function M.get_width()
-    return M.config.width
+    return pane_window.width(M)
 end
 
 --- Apply a resolved normal pane width and refresh markdown layout if needed.
-local function apply_width(width)
+local function apply_width(width, opts)
+    opts = opts or {}
     M.config.width = width
+
+    if opts.relative_width and M.config.sticky_relative_width then
+        M.relative_width = opts.relative_width
+    elseif not opts.preserve_relative_width then
+        M.relative_width = nil
+    end
 
     if not valid_win(M.winid) then
         return width
@@ -381,14 +390,14 @@ end
 
 --- Set the normal pane width from columns, a percentage, or a screen fraction.
 function M.set_width(value)
-    local width, err = api_helpers.resolve_width(value, M.config.width)
+    local width, err, relative_width = api_helpers.resolve_width(value, M.config.width)
 
     if not width then
         vim.notify(err, vim.log.levels.ERROR)
         return nil
     end
 
-    return apply_width(width)
+    return apply_width(width, { relative_width = relative_width })
 end
 
 --- Adjust the normal pane width by a column delta.
@@ -403,6 +412,36 @@ function M.adjust_width(delta)
     return apply_width(width)
 end
 
+--- Toggle whether relative pane widths stay tied to total Neovim columns.
+function M.toggle_sticky_relative_width(enabled)
+    if enabled == nil then
+        enabled = not M.config.sticky_relative_width
+    else
+        enabled = enabled == true
+    end
+
+    M.config.sticky_relative_width = enabled
+
+    if enabled then
+        M.relative_width = api_helpers.relative_width_spec(M.config.width / vim.o.columns, "current")
+    else
+        M.relative_width = nil
+    end
+
+    vim.notify("Sidepanes sticky relative width " .. (enabled and "on" or "off"), vim.log.levels.INFO)
+
+    return enabled
+end
+
+--- Recompute sticky relative width after Neovim columns change.
+function M.refresh_width()
+    if not M.config.sticky_relative_width or not M.relative_width then
+        return nil
+    end
+
+    return apply_width(pane_window.width(M), { preserve_relative_width = true })
+end
+
 
 -- =============================================================================
 -- SETUP AND LIFECYCLE API
@@ -413,9 +452,11 @@ end
 function M.setup(opts)
     lifecycle.setup(M, {
         focus = focus_group,
+        resize = resize_group,
         shutdown = shutdown_group,
     }, {
         record_focus_win = record_focus_win,
+        refresh_width = M.refresh_width,
         shutdown_terminals = M.shutdown_terminals,
     }, opts)
     commands.setup(M, M.config.commands)
@@ -702,6 +743,7 @@ local public_functions = {
     "get_width",
     "set_width",
     "adjust_width",
+    "toggle_sticky_relative_width",
     "text_width",
     "toggle_wrap",
     "open_terminal",

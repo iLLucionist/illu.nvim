@@ -114,6 +114,28 @@ local function wait_for_file(path, needle)
     assert(ok, "did not find " .. needle .. " in " .. path .. ":\n" .. read_file(path))
 end
 
+local function with_options(values, fn)
+    local previous = {}
+
+    for name in pairs(values) do
+        previous[name] = vim.o[name]
+    end
+
+    for name, value in pairs(values) do
+        vim.o[name] = value
+    end
+
+    local ok, err = xpcall(fn, debug.traceback)
+
+    for name, value in pairs(previous) do
+        vim.o[name] = value
+    end
+
+    if not ok then
+        error(err)
+    end
+end
+
 local function capture_notify(fn)
     local original = vim.notify
     local messages = {}
@@ -190,6 +212,7 @@ local function reset_pane()
     pane.shutdown_terminals({ timeout_ms = 50 })
     pane.close()
     pane.zoomed = false
+    pane.relative_width = nil
     pane.source = nil
     pane.markdown_view = nil
     pane.active_mode = "markdown"
@@ -221,6 +244,7 @@ test("public facade hides mutable state and exposes config copy", function()
         "get_width",
         "set_width",
         "adjust_width",
+        "toggle_sticky_relative_width",
         "show_markdown",
         "switch_picker",
         "switch_to",
@@ -356,9 +380,9 @@ test("width parser accepts columns percentages fractions and deltas", function()
 
     local columns = assert(api_helpers.resolve_width(80, 100))
     local string_columns = assert(api_helpers.resolve_width("70", 100))
-    local percent = assert(api_helpers.resolve_width("50%", 100))
-    local fraction = assert(api_helpers.resolve_width("1/3", 100))
-    local numeric_fraction = assert(api_helpers.resolve_width(0.5, 100))
+    local percent, _, percent_spec = assert(api_helpers.resolve_width("50%", 100))
+    local fraction, _, fraction_spec = assert(api_helpers.resolve_width("1/3", 100))
+    local numeric_fraction, _, numeric_fraction_spec = assert(api_helpers.resolve_width(0.5, 100))
     local plus_delta = assert(api_helpers.resolve_width("+10", 80))
     local minus_delta = assert(api_helpers.resolve_width_delta("-5", 80))
     local numeric_delta = assert(api_helpers.resolve_width_delta(7, 80))
@@ -372,6 +396,9 @@ test("width parser accepts columns percentages fractions and deltas", function()
     assert(percent == 60, "percentage width parsed incorrectly")
     assert(fraction == 40, "fraction width parsed incorrectly")
     assert(numeric_fraction == 60, "numeric fraction width parsed incorrectly")
+    assert(percent_spec.ratio == 0.5 and percent_spec.label == "50%", "percentage width did not return relative spec")
+    assert(fraction_spec.ratio == 1 / 3 and fraction_spec.label == "1/3", "fraction width did not return relative spec")
+    assert(numeric_fraction_spec.ratio == 0.5, "numeric fraction width did not return relative spec")
     assert(plus_delta == 90, "relative set width parsed incorrectly")
     assert(minus_delta == 75, "negative width delta parsed incorrectly")
     assert(numeric_delta == 87, "numeric width delta parsed incorrectly")
@@ -615,9 +642,11 @@ test("setup installs single focus and shutdown autocmds when repeated", function
     })
 
     local focus_autocmds = vim.api.nvim_get_autocmds({ group = "SidepanesFocus" })
+    local resize_autocmds = vim.api.nvim_get_autocmds({ group = "SidepanesResize" })
     local shutdown_autocmds = vim.api.nvim_get_autocmds({ group = "SidepanesShutdown" })
 
     assert(#focus_autocmds == 1, "setup duplicated focus autocmds")
+    assert(#resize_autocmds == 1, "setup duplicated resize autocmds")
     assert(#shutdown_autocmds == 1, "setup duplicated shutdown autocmds")
     assert(pane.config.width == 61, "setup lost earlier config merge")
     assert(pane.config.wrap == true, "setup did not merge later config")
@@ -995,6 +1024,9 @@ test("global map registration invokes facade callbacks", function()
         toggle_zoom = function()
             calls.zoom = true
         end,
+        toggle_sticky_relative_width = function()
+            calls.sticky_relative_width = true
+        end,
         switch_picker = function()
             calls.switch = true
         end,
@@ -1020,6 +1052,7 @@ test("global map registration invokes facade callbacks", function()
         clear_ipython = "<leader>zX",
         focus = "<leader>zf",
         zoom = "<leader>zz",
+        sticky_relative_width = "<leader>z%",
         switch = "<leader>zs",
         ask = "<leader>za",
         ask_last = "zA",
@@ -1053,6 +1086,8 @@ test("global map registration invokes facade callbacks", function()
     assert(calls.focus == true, "focus map did not call focus toggle")
     global_map("<leader>zz").callback()
     assert(calls.zoom == true, "zoom map did not call zoom toggle")
+    global_map("<leader>z%").callback()
+    assert(calls.sticky_relative_width == true, "sticky relative width map did not call toggle")
     global_map("<leader>zs").callback()
     assert(calls.switch == true, "switch map did not call switch picker")
     global_map("<leader>za", "x").callback()
@@ -1083,6 +1118,7 @@ test("config normalizes ergonomic markdown and tool setup", function()
         layout = {
             width = 88,
             zoom_text_width = 77,
+            sticky_relative_width = true,
         },
         markdown = {
             wrap = true,
@@ -1123,6 +1159,7 @@ test("config normalizes ergonomic markdown and tool setup", function()
     assert(pane.config.validation == nil, "ergonomic validation table leaked into runtime config")
     assert(pane.config.width == 88, "layout.width did not map to width")
     assert(pane.config.zoom_text_width == 77, "layout.zoom_text_width did not map to zoom_text_width")
+    assert(pane.config.sticky_relative_width == true, "layout.sticky_relative_width did not map to sticky_relative_width")
     assert(pane.config.wrap == true, "markdown.wrap did not map to wrap")
     assert(pane.config.wrap_toggle_key == "<leader>tw", "markdown.wrap_toggle_key did not map to wrap_toggle_key")
     assert(pane.config.sticky_heading == false, "markdown.sticky_heading did not map to sticky_heading")
@@ -1144,6 +1181,42 @@ test("config normalizes ergonomic markdown and tool setup", function()
     assert(pane.config.tools.codex.presets[1].speed == "normal", "generated preset speed was wrong")
 end)
 
+test("setup width accepts columns percentages fractions and numeric ratios", function()
+    reset_pane()
+
+    with_options({ columns = 160, winminwidth = 1 }, function()
+        pane.setup({
+            layout = {
+                width = "50%",
+                sticky_relative_width = false,
+            },
+        })
+
+        assert(pane.config.width == 80, "setup percentage width did not resolve to columns")
+        assert(pane.relative_width == nil, "nonsticky setup width stored a relative width")
+
+        pane.setup({
+            layout = {
+                width = "1/4",
+                sticky_relative_width = true,
+            },
+        })
+
+        assert(pane.config.width == 40, "setup fraction width did not resolve to columns")
+        assert(pane.relative_width and pane.relative_width.ratio == 0.25, "sticky setup fraction did not store relative width")
+
+        pane.setup({
+            layout = {
+                width = 0.5,
+                sticky_relative_width = true,
+            },
+        })
+
+        assert(pane.config.width == 80, "setup numeric ratio width did not resolve to columns")
+        assert(pane.relative_width and pane.relative_width.ratio == 0.5, "sticky setup numeric ratio did not store relative width")
+    end)
+end)
+
 test("canonical default setup normalizes to runtime defaults", function()
     local setup = config.default_setup()
     local normalized = config.normalize(vim.deepcopy(defaults.config), setup)
@@ -1153,6 +1226,7 @@ test("canonical default setup normalizes to runtime defaults", function()
     assert(setup.validate == nil, "default setup exposed flat validation key")
     assert(setup.layout.width == defaults.config.width, "default setup layout width was wrong")
     assert(setup.layout.zoom_text_width == defaults.config.zoom_text_width, "default setup zoom width was wrong")
+    assert(setup.layout.sticky_relative_width == defaults.config.sticky_relative_width, "default setup sticky relative width was wrong")
     assert(setup.markdown.wrap == defaults.config.wrap, "default setup markdown wrap was wrong")
     assert(setup.markdown.reflow.enabled == defaults.config.auto_reflow, "default setup reflow enabled was wrong")
     assert(setup.lifecycle.shutdown_on_exit == defaults.config.shutdown_on_exit, "default setup lifecycle was wrong")
@@ -1164,6 +1238,7 @@ test("runtime config converts to canonical setup shape", function()
     local runtime = vim.tbl_deep_extend("force", vim.deepcopy(defaults.config), {
         width = 72,
         zoom_text_width = 66,
+        sticky_relative_width = true,
         wrap = true,
         wrap_toggle_key = "<leader>xw",
         sticky_heading = false,
@@ -1183,6 +1258,7 @@ test("runtime config converts to canonical setup shape", function()
 
     assert(setup.layout.width == 72, "to_setup lost width")
     assert(setup.layout.zoom_text_width == 66, "to_setup lost zoom text width")
+    assert(setup.layout.sticky_relative_width == true, "to_setup lost sticky relative width")
     assert(setup.markdown.wrap == true, "to_setup lost markdown wrap")
     assert(setup.markdown.wrap_toggle_key == "<leader>xw", "to_setup lost wrap mapping")
     assert(setup.markdown.sticky_heading == false, "to_setup lost sticky heading")
@@ -2559,59 +2635,162 @@ end)
 test("public width api resizes pane and reflows only markdown", function()
     reset_pane()
 
-    local old_columns = vim.o.columns
-    local old_winminwidth = vim.o.winminwidth
     local root = root_fixture("pane-width-api-test")
 
-    vim.o.columns = 140
-    vim.o.winminwidth = 1
+    with_options({ columns = 140, winminwidth = 1 }, function()
+        write(root .. "/docs/doc.md", {
+            "# Doc",
+            "",
+            "This paragraph should fit as a single line when the pane starts wide but should wrap into multiple shorter lines after the public width API narrows the pane.",
+        })
 
-    write(root .. "/docs/doc.md", {
-        "# Doc",
-        "",
-        "This paragraph should fit as a single line when the pane starts wide but should wrap into multiple shorter lines after the public width API narrows the pane.",
-    })
-
-    pane.setup({
-        width = 100,
-        reflow_margin = 4,
-        auto_reflow = true,
-        external_reflow_cmd = false,
-        tools = {
-            ipython = {
-                label = "IPython",
-                ask = false,
-                cmd = { "sh", "-c", "sleep 10" },
-                presets = { { name = "default", label = "Default", args = {} } },
+        pane.setup({
+            width = 100,
+            reflow_margin = 4,
+            auto_reflow = true,
+            external_reflow_cmd = false,
+            tools = {
+                ipython = {
+                    label = "IPython",
+                    ask = false,
+                    cmd = { "sh", "-c", "sleep 10" },
+                    presets = { { name = "default", label = "Default", args = {} } },
+                },
             },
-        },
-    })
-    pane.open(root .. "/docs/doc.md")
+        })
+        pane.open(root .. "/docs/doc.md")
 
-    local initial_line_count = vim.api.nvim_buf_line_count(pane.bufnr)
-    local width = sidepanes.set_width("50%")
+        local initial_line_count = vim.api.nvim_buf_line_count(pane.bufnr)
+        local width = sidepanes.set_width("50%")
 
-    assert(width == 70, "percentage width did not resolve against screen columns")
-    assert(sidepanes.get_width() == 70, "get_width did not return configured width")
-    assert(vim.api.nvim_win_get_width(pane.winid) == 70, "set_width did not resize open pane")
+        assert(width == 70, "percentage width did not resolve against screen columns")
+        assert(sidepanes.get_width() == 70, "get_width did not return configured width")
+        assert(vim.api.nvim_win_get_width(pane.winid) == 70, "set_width did not resize open pane")
 
-    sidepanes.adjust_width("-30")
+        sidepanes.adjust_width("-30")
 
-    assert(sidepanes.get_width() == 40, "adjust_width did not update configured width")
-    assert(vim.api.nvim_win_get_width(pane.winid) == 40, "adjust_width did not resize open pane")
-    assert(vim.api.nvim_buf_line_count(pane.bufnr) > initial_line_count, "narrowing Sidepanes viewer did not reflow")
+        assert(sidepanes.get_width() == 40, "adjust_width did not update configured width")
+        assert(vim.api.nvim_win_get_width(pane.winid) == 40, "adjust_width did not resize open pane")
+        assert(vim.api.nvim_buf_line_count(pane.bufnr) > initial_line_count, "narrowing Sidepanes viewer did not reflow")
 
-    local markdown_lines_after_reflow = vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false)
+        local markdown_lines_after_reflow = vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false)
 
-    pane.open_terminal("ipython", nil, { root = root, focus = true })
-    sidepanes.set_width("1/2")
+        pane.open_terminal("ipython", nil, { root = root, focus = true })
+        sidepanes.set_width("1/2")
 
-    assert(pane.active_mode == "ipython", "width change left terminal mode")
-    assert(vim.api.nvim_win_get_width(pane.winid) == 70, "fraction width did not resize terminal pane")
-    assert(vim.deep_equal(vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false), markdown_lines_after_reflow), "terminal width change reflowed markdown buffer")
+        assert(pane.active_mode == "ipython", "width change left terminal mode")
+        assert(vim.api.nvim_win_get_width(pane.winid) == 70, "fraction width did not resize terminal pane")
+        assert(vim.deep_equal(vim.api.nvim_buf_get_lines(pane.bufnr, 0, -1, false), markdown_lines_after_reflow), "terminal width change reflowed markdown buffer")
+    end)
+end)
 
-    vim.o.columns = old_columns
-    vim.o.winminwidth = old_winminwidth
+test("sticky relative width tracks Neovim columns after relative widths", function()
+    reset_pane()
+
+    local root = root_fixture("sticky-relative-width-test")
+
+    with_options({ columns = 140, winminwidth = 1 }, function()
+        write(root .. "/docs/doc.md", {
+            "# Doc",
+            "",
+            "This paragraph is present so sticky relative width can reflow markdown after the total editor width changes.",
+        })
+
+        pane.setup({
+            width = 80,
+            sticky_relative_width = true,
+            reflow_margin = 4,
+            auto_reflow = true,
+            external_reflow_cmd = false,
+        })
+        pane.open(root .. "/docs/doc.md")
+
+        sidepanes.set_width("50%")
+
+        assert(sidepanes.get_width() == 70, "sticky percentage width did not resolve initially")
+        assert(pane.relative_width and pane.relative_width.ratio == 0.5, "sticky percentage did not store relative width")
+
+        vim.o.columns = 180
+        pane.refresh_width()
+
+        assert(sidepanes.get_width() == 90, "sticky percentage width did not track resized columns")
+        assert(vim.api.nvim_win_get_width(pane.winid) == 90, "sticky percentage did not resize open pane")
+
+        sidepanes.set_width(100)
+
+        assert(pane.relative_width == nil, "absolute width did not clear sticky relative width")
+
+        vim.o.columns = 200
+        pane.refresh_width()
+
+        assert(sidepanes.get_width() == 100, "absolute width changed after resize despite cleared sticky relative width")
+
+        sidepanes.set_width("1/2")
+        vim.o.columns = 160
+        vim.api.nvim_exec_autocmds("VimResized", {})
+
+        assert(sidepanes.get_width() == 80, "VimResized did not refresh sticky relative width")
+    end)
+end)
+
+test("sticky relative width toggle captures and releases current width ratio", function()
+    reset_pane()
+
+    with_options({ columns = 200, winminwidth = 1 }, function()
+        pane.setup({
+            width = 100,
+            sticky_relative_width = false,
+        })
+
+        capture_notify(function()
+            sidepanes.toggle_sticky_relative_width()
+        end)
+
+        assert(pane.config.sticky_relative_width == true, "sticky relative width config did not enable")
+        assert(pane.relative_width and pane.relative_width.ratio == 0.5, "sticky toggle did not capture current width ratio")
+
+        vim.o.columns = 160
+        pane.refresh_width()
+
+        assert(sidepanes.get_width() == 80, "sticky toggle did not keep current width ratio after resize")
+
+        capture_notify(function()
+            sidepanes.toggle_sticky_relative_width()
+        end)
+
+        assert(pane.config.sticky_relative_width == false, "sticky relative width config did not disable")
+        assert(pane.relative_width == nil, "sticky relative width toggle did not clear relative target")
+
+        vim.o.columns = 220
+        pane.refresh_width()
+
+        assert(sidepanes.get_width() == 80, "disabled sticky relative width still changed after resize")
+    end)
+end)
+
+test("relative width inputs stay absolute when sticky relative width is disabled", function()
+    reset_pane()
+
+    local root = root_fixture("nonsticky-relative-width-test")
+
+    with_options({ columns = 140 }, function()
+        write(root .. "/docs/doc.md", { "# Doc" })
+
+        pane.setup({
+            width = 80,
+            sticky_relative_width = false,
+        })
+        pane.open(root .. "/docs/doc.md")
+        sidepanes.set_width("50%")
+
+        assert(sidepanes.get_width() == 70, "nonsticky percentage width did not resolve initially")
+        assert(pane.relative_width == nil, "nonsticky percentage stored relative width")
+
+        vim.o.columns = 180
+        pane.refresh_width()
+
+        assert(sidepanes.get_width() == 70, "nonsticky percentage width changed after resize")
+    end)
 end)
 
 test("external mdfmt reflow preserves markdown tables", function()

@@ -6,6 +6,7 @@ Architecture: Isolates Neovim window side effects from viewer, terminal, and swi
 ]]
 
 local util = require("sidepanes.util")
+local api = require("sidepanes.api")
 
 local M = {}
 
@@ -26,6 +27,10 @@ end
 --- Compute the pane width for normal or zoomed layout.
 function M.width(state)
     if not state.zoomed then
+        if state.config.sticky_relative_width and state.relative_width then
+            return api.width_from_spec(state.relative_width) or state.config.width
+        end
+
         return state.config.width
     end
 
