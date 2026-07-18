@@ -1,7 +1,7 @@
 --[[
 sidepanes.commands
 Purpose: Register user commands that expose the sidepanes public API.
-Does: Creates the Sidepanes and Pane commands for switching, asking, focusing, zooming, and controlling Codex, Claude, and IPython panes.
+Does: Creates Sidepanes-prefixed commands for switching, asking, focusing, zooming, and controlling Codex, Claude, and IPython panes.
 Architecture: Keeps command registration out of init.lua while receiving the facade table as its API surface.
 ]]
 
@@ -11,18 +11,18 @@ local default_names = {
     toggle = "SidepanesToggle",
     pick = "SidepanesPick",
     headings = "SidepanesHeadings",
-    switch = "PaneSwitch",
-    tool = "PaneTool",
-    codex = "PaneCodex",
-    claude = "PaneClaude",
-    ipython = "PaneIPython",
-    ipython_restart = "PaneIPythonRestart",
-    ipython_clear = "PaneIPythonClear",
-    focus = "PaneFocus",
-    zoom = "PaneZoom",
-    ask = "PaneAsk",
-    ask_codex = "PaneAskCodex",
-    ask_claude = "PaneAskClaude",
+    switch = "SidepanesSwitch",
+    tool = "SidepanesTool",
+    codex = "SidepanesCodex",
+    claude = "SidepanesClaude",
+    ipython = "SidepanesIPython",
+    ipython_restart = "SidepanesIPythonRestart",
+    ipython_clear = "SidepanesIPythonClear",
+    focus = "SidepanesFocus",
+    zoom = "SidepanesZoom",
+    ask = "SidepanesAsk",
+    ask_codex = "SidepanesAskCodex",
+    ask_claude = "SidepanesAskClaude",
 }
 
 --- Register a user command unless its configured name is disabled.

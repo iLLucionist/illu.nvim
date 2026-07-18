@@ -535,6 +535,66 @@ test("command registration invokes facade callbacks", function()
     assert(calls.ask_tool.opts.line1 == 6 and calls.ask_tool.opts.line2 == 7, "ask claude command did not forward range")
 end)
 
+test("default command names use Sidepanes prefix", function()
+    local api = {
+        toggle = function() end,
+        pick = function() end,
+        pick_headings = function() end,
+        switch_picker = function() end,
+        open_terminal = function() end,
+        open_ipython = function() end,
+        restart_ipython = function() end,
+        clear_ipython = function() end,
+        focus_toggle = function() end,
+        toggle_zoom = function() end,
+        ask_picker = function() end,
+        ask = function() end,
+    }
+
+    commands.setup(api, true)
+
+    local command_table = vim.api.nvim_get_commands({})
+    local expected = {
+        "SidepanesToggle",
+        "SidepanesPick",
+        "SidepanesHeadings",
+        "SidepanesSwitch",
+        "SidepanesTool",
+        "SidepanesCodex",
+        "SidepanesClaude",
+        "SidepanesIPython",
+        "SidepanesIPythonRestart",
+        "SidepanesIPythonClear",
+        "SidepanesFocus",
+        "SidepanesZoom",
+        "SidepanesAsk",
+        "SidepanesAskCodex",
+        "SidepanesAskClaude",
+    }
+    local forbidden = {
+        "PaneSwitch",
+        "PaneTool",
+        "PaneCodex",
+        "PaneClaude",
+        "PaneIPython",
+        "PaneIPythonRestart",
+        "PaneIPythonClear",
+        "PaneFocus",
+        "PaneZoom",
+        "PaneAsk",
+        "PaneAskCodex",
+        "PaneAskClaude",
+    }
+
+    for _, name in ipairs(expected) do
+        assert(command_table[name], "default command missing: " .. name)
+    end
+
+    for _, name in ipairs(forbidden) do
+        assert(not command_table[name], "generic Pane command should not be registered: " .. name)
+    end
+end)
+
 test("global map registration invokes facade callbacks", function()
     local calls = {}
     local bufnr = vim.api.nvim_get_current_buf()

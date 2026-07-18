@@ -366,9 +366,38 @@ local sidepanes = require("sidepanes")
 local markdown_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" }
 
 sidepanes.setup({
+    width = 100,
+    wrap = false,
+    auto_reflow = true,
     external_reflow_cmd = markdown_reflow_cmd,
+    external_reflow_fallback = true,
     external_reflow_protect_tables = true,
-    commands = true,
+    reflow_margin = 8,
+    zoom_text_width = 90,
+    sticky_heading = true,
+    wrap_toggle_key = "<leader>mw",
+    focus_on_switch = true,
+    focus_on_ask = true,
+    shutdown_on_exit = true,
+    shutdown_timeout_ms = 300,
+    validate = true,
+    commands = {
+        toggle = "SidepanesToggle",
+        pick = "SidepanesPick",
+        headings = "SidepanesHeadings",
+        switch = "SidepanesSwitch",
+        tool = "SidepanesTool",
+        codex = "SidepanesCodex",
+        claude = "SidepanesClaude",
+        ipython = "SidepanesIPython",
+        ipython_restart = "SidepanesIPythonRestart",
+        ipython_clear = "SidepanesIPythonClear",
+        focus = "SidepanesFocus",
+        zoom = "SidepanesZoom",
+        ask = "SidepanesAsk",
+        ask_codex = "SidepanesAskCodex",
+        ask_claude = "SidepanesAskClaude",
+    },
     mappings = {
         global = {
             toggle = "<leader>pp",
@@ -388,6 +417,99 @@ sidepanes.setup({
             ask_last = "aa",
             ask_codex = "ax",
             ask_claude = "ac",
+        },
+        pane = {
+            markdown = "<space>0",
+            codex = "<space>x",
+            claude = "<space>c",
+            ipython = "<space>i",
+            toggle_agent = "<leader>gg",
+            toggle_agent_alt = "<C-g>",
+            ipython_alt = "<leader>gi",
+            gf = "gf",
+            ask_last = "aa",
+            ask_codex = "ax",
+            ask_claude = "ac",
+        },
+    },
+    tools = {
+        codex = {
+            label = "Codex",
+            cmd = "codex",
+            include_cd_arg = true,
+            send_delay_ms = 700,
+            switch_command = "/model {model} {effort} {speed}",
+            exit_command = "/quit\r",
+            models = { "gpt-5.5", "gpt-5.6-sol" },
+            efforts = { "high", "medium", "xhigh" },
+            speeds = { "fast", "normal" },
+            default = { model = "gpt-5.5", effort = "high", speed = "fast" },
+        },
+        claude = {
+            label = "Claude",
+            cmd = "claude",
+            send_delay_ms = 700,
+            switch_command = "/model {model} {effort}",
+            exit_command = "/exit\r",
+            presets = {
+                {
+                    name = "sonnet",
+                    label = "Sonnet / normal",
+                    model = "sonnet",
+                    effort = "medium",
+                    args = { "--model", "sonnet", "--effort", "medium" },
+                },
+                {
+                    name = "sonnet_high",
+                    label = "Sonnet / high",
+                    model = "sonnet",
+                    effort = "high",
+                    args = { "--model", "sonnet", "--effort", "high" },
+                },
+                {
+                    name = "opus_high",
+                    label = "Opus / high",
+                    model = "opus",
+                    effort = "high",
+                    args = { "--model", "opus", "--effort", "high" },
+                },
+                {
+                    name = "fable_high",
+                    label = "Fable / high",
+                    model = "fable",
+                    effort = "high",
+                    args = { "--model", "fable", "--effort", "high" },
+                },
+                {
+                    name = "default",
+                    label = "Default",
+                    args = {},
+                },
+            },
+        },
+        ipython = {
+            label = "IPython",
+            ask = false,
+            cmd = function()
+                if vim.env.VIRTUAL_ENV and vim.fn.executable("ipython") == 1 then
+                    return { "ipython" }
+                end
+
+                if vim.fn.executable("uv") == 1 then
+                    return { "uv", "run", "ipython" }
+                end
+
+                return { "ipython" }
+            end,
+            send_delay_ms = 500,
+            exit_command = "quit()\r",
+            presets = {
+                {
+                    name = "default",
+                    label = "Default",
+                    args = {},
+                },
+            },
         },
     },
 })

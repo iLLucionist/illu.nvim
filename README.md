@@ -59,7 +59,7 @@ require("sidepanes").setup({
 
 For reusable generated tool tables, use `require("sidepanes.presets").codex(...)` or `require("sidepanes.presets").claude(...)`.
 
-Set `commands = true` to register the default `:Sidepanes*` and `:Pane*` commands. Set `mappings.global` to a table to install global mappings. `mappings.pane` customizes buffer-local pane mappings; set an entry to `false` to disable it.
+Set `commands = true` to register the default `:Sidepanes*` commands. Set `mappings.global` to a table to install global mappings. `mappings.pane` customizes buffer-local pane mappings; set an entry to `false` to disable it.
 
 Run `:checkhealth sidepanes` to inspect external commands, optional dependencies, tool presets, command registration, and mapping configuration.
 
