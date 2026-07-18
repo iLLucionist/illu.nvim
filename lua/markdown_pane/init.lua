@@ -1,3 +1,8 @@
+-- =============================================================================
+-- MODULE IMPORTS
+-- =============================================================================
+
+
 local defaults = require("markdown_pane.defaults")
 local context = require("markdown_pane.context")
 local document_picker = require("markdown_pane.document_picker")
@@ -14,6 +19,12 @@ local util = require("markdown_pane.util")
 local pane_window = require("markdown_pane.window")
 local viewer = require("markdown_pane.viewer")
 local winbar = require("markdown_pane.winbar")
+
+
+-- =============================================================================
+-- PUBLIC MODULE STATE
+-- =============================================================================
+
 
 local M = {
     winid = nil,
@@ -33,12 +44,30 @@ local M = {
     config = vim.deepcopy(defaults.config),
 }
 
+
+-- =============================================================================
+-- AUTOCMD GROUPS
+-- =============================================================================
+
+
 local sticky_heading_group = vim.api.nvim_create_augroup("MarkdownPaneStickyHeading", { clear = true })
 local focus_group = vim.api.nvim_create_augroup("MarkdownPaneFocus", { clear = true })
 local shutdown_group = vim.api.nvim_create_augroup("MarkdownPaneShutdown", { clear = true })
 
+
+-- =============================================================================
+-- SHARED ALIASES
+-- =============================================================================
+
+
 local valid_win = util.valid_win
 local statusline_escape = heading.statusline_escape
+
+
+-- =============================================================================
+-- PICKER AND CONTEXT HELPERS
+-- =============================================================================
+
 
 --- Show a numbered/lettered picker and pass the selected entry to a callback.
 local function numbered_select(prompt, entries, callback)
@@ -92,6 +121,12 @@ local function last_coding_agent_context(root)
     return terminal.last_coding_agent_context(M, root)
 end
 
+
+-- =============================================================================
+-- VIEWER STATE AND HEADING HELPERS
+-- =============================================================================
+
+
 --- Return the user-selected wrap state or configured wrap default.
 local function preferred_wrap()
     return pane_window.preferred_wrap(M)
@@ -127,12 +162,24 @@ local function ensure_buf()
     return viewer.ensure_buf(M)
 end
 
+
+-- =============================================================================
+-- FORWARD DECLARATIONS FOR MUTUALLY-DEPENDENT MODULE CALLBACKS
+-- =============================================================================
+
+
 local render_markview
 local setup_pane_maps
 local window_deps
 local viewer_deps
 local render_deps
 local switcher_deps
+
+
+-- =============================================================================
+-- WINDOW, RENDER, AND ROOT HELPERS
+-- =============================================================================
+
 
 --- Apply pane-local window options for markdown or terminal mode.
 local function set_window_options(winid, mode)
@@ -154,6 +201,12 @@ local function pane_root(bufnr)
     return context.pane_root(M, bufnr)
 end
 
+
+-- =============================================================================
+-- PANE-LOCAL KEYMAPS
+-- =============================================================================
+
+
 --- Install pane-local mappings on a markdown or terminal pane buffer.
 setup_pane_maps = function(bufnr)
     maps.setup(bufnr, {
@@ -172,6 +225,12 @@ setup_pane_maps = function(bufnr)
         end,
     })
 end
+
+
+-- =============================================================================
+-- DEPENDENCY FACTORIES
+-- =============================================================================
+
 
 --- Build window module callbacks that still belong to pane/viewer state.
 window_deps = function()
@@ -201,6 +260,12 @@ render_deps = function()
     }
 end
 
+
+-- =============================================================================
+-- VIEWER DEPENDENCY FACTORY AND WRAP API
+-- =============================================================================
+
+
 --- Toggle wrapping in the markdown viewer pane.
 function M.toggle_wrap()
     render.toggle_wrap(M, render_deps())
@@ -220,6 +285,12 @@ viewer_deps = function()
         update_sticky_heading = update_sticky_heading,
     }
 end
+
+
+-- =============================================================================
+-- MARKDOWN VIEWER AND PANE WINDOW API
+-- =============================================================================
+
 
 --- Open a markdown file in the pane without stealing focus.
 function M.open(path)
@@ -261,6 +332,12 @@ function M.text_width()
     return pane_text_width()
 end
 
+
+-- =============================================================================
+-- SETUP AND LIFECYCLE API
+-- =============================================================================
+
+
 --- Merge user configuration and install pane autocmds.
 function M.setup(opts)
     lifecycle.setup(M, {
@@ -271,6 +348,12 @@ function M.setup(opts)
         shutdown_terminals = M.shutdown_terminals,
     }, opts)
 end
+
+
+-- =============================================================================
+-- TERMINAL ENTRY AND SELECTION HELPERS
+-- =============================================================================
+
 
 --- Resolve a configured preset by name, label, or default position.
 local function preset_by_name(tool, preset_name)
@@ -292,6 +375,12 @@ local function selection_context(opts)
     return context.selection_context(M, opts)
 end
 
+
+-- =============================================================================
+-- TERMINAL DEPENDENCY FACTORY
+-- =============================================================================
+
+
 --- Build terminal module callbacks that still belong to pane/window state.
 local function terminal_deps()
     return {
@@ -304,6 +393,12 @@ local function terminal_deps()
     }
 end
 
+
+-- =============================================================================
+-- CODING-AGENT TERMINAL API
+-- =============================================================================
+
+
 --- Open or focus a pane terminal, reusing an existing session when possible.
 function M.open_terminal(tool_name, preset_name, opts)
     return terminal.open(M, terminal_deps(), tool_name, preset_name, opts)
@@ -313,6 +408,12 @@ end
 function M.show_last_agent(opts)
     terminal.show_last_agent(M, terminal_deps(), opts)
 end
+
+
+-- =============================================================================
+-- PANE SWITCHER API
+-- =============================================================================
+
 
 --- Build switcher module callbacks that still belong to pane state.
 switcher_deps = function()
@@ -343,6 +444,12 @@ function M.switch_picker()
     switcher.switch_picker(M, switcher_deps())
 end
 
+
+-- =============================================================================
+-- TERMINAL SEND, IPYTHON, AND SHUTDOWN API
+-- =============================================================================
+
+
 --- Send an ask prompt, switching model first when needed.
 local function send_prompt_to_terminal(ctx, entry, prompt, started)
     terminal.send_prompt(M, ctx, entry, prompt, started)
@@ -372,6 +479,12 @@ end
 function M.shutdown_terminals(opts)
     terminal.shutdown_terminals(M, opts)
 end
+
+
+-- =============================================================================
+-- ASK PROMPT EDITOR API
+-- =============================================================================
+
 
 --- Build question-editor callbacks that still belong to pane/window state.
 local function question_deps()
@@ -438,10 +551,22 @@ function M.ask(tool_name, preset_name, opts)
     question.ask(M, question_deps(), tool_name, preset_name, opts)
 end
 
+
+-- =============================================================================
+-- DOCUMENT PICKER API
+-- =============================================================================
+
+
 --- Pick a markdown document and open it in the pane.
 function M.pick()
     document_picker.pick(M.open)
 end
+
+
+-- =============================================================================
+-- MODULE BOOTSTRAP
+-- =============================================================================
+
 
 setup_sticky_heading_autocmds()
 
