@@ -224,15 +224,17 @@ test("pane-local slot maps exist on markdown and terminal panes", function()
 
     pane.open(root .. "/docs/doc.md")
 
-    for _, lhs in ipairs({ " 0", " x", " c", " i" }) do
+    for _, lhs in ipairs({ " 0", " x", " c", " i", "zz" }) do
         assert(has_nowait_map(pane.bufnr, lhs), lhs .. " missing on sidepanes")
     end
+    assert(has_map(pane.bufnr, "ll", "x"), "ll missing on sidepanes")
 
     local ctx = pane.open_terminal("ipython", nil, { root = root, focus = true })
 
-    for _, lhs in ipairs({ " 0", " x", " c", " i" }) do
+    for _, lhs in ipairs({ " 0", " x", " c", " i", "zz" }) do
         assert(has_nowait_map(ctx.bufnr, lhs), lhs .. " missing on terminal pane")
     end
+    assert(has_map(ctx.bufnr, "ll", "x"), "ll missing on terminal pane")
 end)
 
 test("pane-local mappings are configurable", function()
@@ -262,6 +264,8 @@ test("pane-local mappings are configurable", function()
                 toggle_agent_alt = false,
                 ipython_alt = false,
                 gf = "mf",
+                send_ipython = "ml",
+                zoom = "mz",
                 ask_last = "ma",
                 ask_codex = "mx",
                 ask_claude = "mc",
@@ -273,8 +277,14 @@ test("pane-local mappings are configurable", function()
         show_markdown = function()
             calls.markdown = true
         end,
+        send_ipython = function(opts)
+            calls.send_ipython = opts
+        end,
         toggle_markdown_agent = function()
             calls.toggle_agent = true
+        end,
+        toggle_zoom = function()
+            calls.zoom = true
         end,
         toggle_wrap = function()
             calls.wrap = true
@@ -290,6 +300,8 @@ test("pane-local mappings are configurable", function()
     assert(has_nowait_map(bufnr, "mi"), "custom IPython pane map missing")
     assert(has_map(bufnr, "mg"), "custom toggle-agent pane map missing")
     assert(has_map(bufnr, "mf"), "custom smart-gf pane map missing")
+    assert(has_map(bufnr, "ml", "x"), "custom send-IPython pane map missing")
+    assert(has_map(bufnr, "mz"), "custom zoom pane map missing")
     assert(has_map(bufnr, "ma", "x"), "custom ask-last pane map missing")
     assert(has_map(bufnr, "mx", "x"), "custom ask-Codex pane map missing")
     assert(has_map(bufnr, "mc", "x"), "custom ask-Claude pane map missing")
@@ -307,6 +319,10 @@ test("pane-local mappings are configurable", function()
     assert(calls.open_terminal.tool_name == "ipython", "custom IPython pane map used wrong tool")
     call_map(bufnr, "mg")
     assert(calls.toggle_agent == true, "custom toggle-agent pane map did not call toggle")
+    call_map(bufnr, "ml", "x")
+    assert(calls.send_ipython.bufnr == bufnr and calls.send_ipython.visual == true, "custom send-IPython pane map did not pass visual opts")
+    call_map(bufnr, "mz")
+    assert(calls.zoom == true, "custom zoom pane map did not call zoom")
     call_map(bufnr, "ma", "x")
     assert(calls.ask_last.bufnr == bufnr and calls.ask_last.visual == true, "custom ask-last pane map did not pass visual opts")
     call_map(bufnr, "mx", "x")

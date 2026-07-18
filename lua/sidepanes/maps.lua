@@ -83,6 +83,14 @@ function M.setup(bufnr, deps)
         require("smart_gf").open()
     end, "Smart go to file from pane")
 
+    map(bufnr, "x", mappings.send_ipython, function()
+        deps.send_ipython(visual_opts(bufnr))
+    end, "Send selection to IPython")
+
+    map(bufnr, "n", mappings.zoom, function()
+        deps.toggle_zoom()
+    end, "Toggle sidepanes zoom", { nowait = true })
+
     map(bufnr, "x", mappings.ask_last, function()
         deps.ask_last_coding_agent(visual_opts(bufnr))
     end, "Ask last coding agent")

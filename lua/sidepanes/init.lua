@@ -230,8 +230,10 @@ setup_pane_maps = function(bufnr)
             return M.config.mappings and M.config.mappings.pane
         end,
         pane_root = pane_root,
+        send_ipython = M.send_ipython,
         show_markdown = M.show_markdown,
         toggle_markdown_agent = M.toggle_markdown_agent,
+        toggle_zoom = M.toggle_zoom,
         toggle_wrap = M.toggle_wrap,
         wrap_toggle_key = function()
             return M.config.wrap_toggle_key

@@ -438,6 +438,8 @@ sidepanes.setup({
             toggle_agent_alt = "<C-g>",
             ipython_alt = "<leader>gi",
             gf = "gf",
+            send_ipython = "ll",
+            zoom = "zz",
             ask_last = "aa",
             ask_codex = "ax",
             ask_claude = "ac",

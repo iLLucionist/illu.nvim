@@ -58,6 +58,8 @@ local expected_pane_mappings = {
     "toggle_agent_alt",
     "ipython_alt",
     "gf",
+    "send_ipython",
+    "zoom",
     "ask_last",
     "ask_codex",
     "ask_claude",
