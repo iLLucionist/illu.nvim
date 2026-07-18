@@ -7,6 +7,7 @@ local question = require("markdown_pane.question")
 local selection = require("markdown_pane.selection")
 local terminal = require("markdown_pane.terminal")
 local util = require("markdown_pane.util")
+local pane_window = require("markdown_pane.window")
 
 local M = {
     winid = nil,
@@ -66,23 +67,9 @@ end
 
 --- Remember the most recent normal window outside the pane.
 local function record_focus_win(winid)
-    winid = winid or vim.api.nvim_get_current_win()
-
-    if not valid_win(winid) or winid == M.winid then
-        return
-    end
-
-    local config = vim.api.nvim_win_get_config(winid)
-
-    if config.relative and config.relative ~= "" then
-        return
-    end
-
-    if is_pane_buf(vim.api.nvim_win_get_buf(winid)) then
-        return
-    end
-
-    M.last_focus_win = winid
+    pane_window.record_focus_win(M, {
+        is_pane_buf = is_pane_buf,
+    }, winid)
 end
 
 --- Find the pane terminal context for a buffer.
@@ -141,52 +128,12 @@ end
 
 --- Return the user-selected wrap state or configured wrap default.
 local function preferred_wrap()
-    if M.wrap_enabled == nil then
-        return M.config.wrap
-    end
-
-    return M.wrap_enabled
-end
-
---- Return the wrap state after considering zoom mode.
-local function effective_wrap()
-    return preferred_wrap()
-end
-
---- Compute the pane width for normal or zoomed layout.
-local function pane_width()
-    if not M.zoomed then
-        return M.config.width
-    end
-
-    local reserved = math.max(1, tonumber(vim.o.winminwidth) or 1)
-    local separator = 1
-    local max_width = vim.o.columns - reserved - separator
-
-    return math.max(M.config.width, max_width)
+    return pane_window.preferred_wrap(M)
 end
 
 --- Compute the text reflow width available inside the pane.
 local function pane_text_width(winid)
-    winid = winid or M.winid
-
-    if not valid_win(winid) then
-        return nil
-    end
-
-    local width = vim.api.nvim_win_get_width(winid)
-
-    if vim.api.nvim_get_option_value("number", { win = winid }) then
-        width = width - vim.api.nvim_get_option_value("numberwidth", { win = winid })
-    end
-
-    local text_width = math.max(20, width - M.config.reflow_margin)
-
-    if M.zoomed and M.config.zoom_text_width and M.config.zoom_text_width > 0 then
-        return math.min(text_width, M.config.zoom_text_width)
-    end
-
-    return text_width
+    return pane_window.text_width(M, winid)
 end
 
 --- Save the markdown pane cursor and scroll view for later restoration.
@@ -310,27 +257,11 @@ end
 
 local render_markview
 local setup_pane_maps
+local window_deps
 
 --- Apply pane-local window options for markdown or terminal mode.
 local function set_window_options(winid, mode)
-    mode = mode or M.active_mode
-
-    local wrap = effective_wrap()
-
-    vim.api.nvim_set_option_value("winfixwidth", true, { win = winid })
-    vim.api.nvim_set_option_value("number", mode == "markdown", { win = winid })
-    vim.api.nvim_set_option_value("relativenumber", false, { win = winid })
-    vim.api.nvim_set_option_value("wrap", mode == "markdown" and wrap or false, { win = winid })
-    vim.api.nvim_set_option_value("linebreak", mode == "markdown" and wrap or false, { win = winid })
-    vim.api.nvim_set_option_value("breakindent", mode == "markdown" and wrap or false, { win = winid })
-    vim.api.nvim_set_option_value("showbreak", "  ", { win = winid })
-    vim.api.nvim_set_option_value("cursorline", mode == "markdown", { win = winid })
-    vim.api.nvim_set_option_value("signcolumn", "no", { win = winid })
-    vim.api.nvim_set_option_value("foldcolumn", "0", { win = winid })
-    vim.api.nvim_set_option_value("colorcolumn", "", { win = winid })
-    vim.api.nvim_set_option_value("conceallevel", mode == "markdown" and 3 or 0, { win = winid })
-    vim.api.nvim_set_option_value("concealcursor", mode == "markdown" and "nvic" or "", { win = winid })
-    update_sticky_heading()
+    pane_window.set_options(M, window_deps(), winid, mode)
 end
 
 --- Re-render markview decorations for a markdown buffer.
@@ -380,17 +311,7 @@ end
 
 --- Re-apply wrap settings and refresh markdown rendering if needed.
 local function apply_wrap_state()
-    if not valid_win(M.winid) or not valid_buf(M.bufnr) then
-        return
-    end
-
-    local before = vim.wo[M.winid].wrap
-
-    set_window_options(M.winid)
-
-    if before ~= vim.wo[M.winid].wrap then
-        render_markview(M.bufnr)
-    end
+    pane_window.apply_wrap_state(M, window_deps())
 end
 
 --- Resolve the project root associated with a pane buffer.
@@ -427,57 +348,23 @@ setup_pane_maps = function(bufnr)
     })
 end
 
+--- Build window module callbacks that still belong to pane/viewer state.
+window_deps = function()
+    return {
+        ensure_buf = ensure_buf,
+        is_pane_buf = is_pane_buf,
+        open_markdown = M.open,
+        reflow_pane_buffer = reflow_pane_buffer,
+        render_markview = render_markview,
+        restore_markdown_view = restore_markdown_view,
+        save_markdown_view = save_markdown_view,
+        update_sticky_heading = update_sticky_heading,
+    }
+end
+
 --- Create or reuse the side pane window for a buffer and mode.
 local function ensure_win(bufnr, mode, opts)
-    opts = opts or {}
-    bufnr = bufnr or ensure_buf()
-    mode = mode or M.active_mode
-
-    if valid_win(M.winid) then
-        if valid_buf(bufnr) and vim.api.nvim_win_get_buf(M.winid) ~= bufnr then
-            vim.api.nvim_win_set_buf(M.winid, bufnr)
-        end
-
-        vim.api.nvim_win_set_width(M.winid, pane_width())
-        set_window_options(M.winid, mode)
-
-        if opts.focus then
-            local previous = vim.api.nvim_get_current_win()
-
-            if previous ~= M.winid and valid_win(previous) then
-                M.last_focus_win = previous
-            end
-
-            vim.api.nvim_set_current_win(M.winid)
-        end
-
-        return M.winid
-    end
-
-    local previous = vim.api.nvim_get_current_win()
-
-    vim.cmd("botright vertical " .. pane_width() .. "split")
-    M.winid = vim.api.nvim_get_current_win()
-    vim.api.nvim_win_set_buf(M.winid, bufnr)
-    vim.api.nvim_win_set_width(M.winid, pane_width())
-    set_window_options(M.winid, mode)
-    update_sticky_heading()
-
-    if mode == "markdown" then
-        render_markview(bufnr)
-    end
-
-    if opts.focus then
-        if valid_win(previous) and previous ~= M.winid then
-            M.last_focus_win = previous
-        end
-
-        vim.api.nvim_set_current_win(M.winid)
-    elseif valid_win(previous) then
-        vim.api.nvim_set_current_win(previous)
-    end
-
-    return M.winid
+    return pane_window.ensure(M, window_deps(), bufnr, mode, opts)
 end
 
 --- Load markdown file contents into the pane buffer.
@@ -603,15 +490,7 @@ end
 
 --- Close the pane window while preserving buffers and state.
 function M.close()
-    if valid_win(M.winid) then
-        if M.active_mode == "markdown" then
-            save_markdown_view()
-        end
-
-        vim.api.nvim_win_close(M.winid, true)
-    end
-
-    M.winid = nil
+    pane_window.close(M, window_deps())
 end
 
 --- Toggle the pane, optionally opening a specific markdown file.
@@ -627,73 +506,17 @@ end
 
 --- Return whether the pane window is currently open.
 function M.is_open()
-    return valid_win(M.winid)
+    return pane_window.is_open(M)
 end
 
 --- Toggle focus between the pane and the last normal window.
 function M.focus_toggle()
-    local current = vim.api.nvim_get_current_win()
-
-    if valid_win(M.winid) and current == M.winid then
-        if valid_win(M.last_focus_win) then
-            vim.api.nvim_set_current_win(M.last_focus_win)
-        else
-            vim.cmd("wincmd p")
-        end
-
-        return
-    end
-
-    if valid_win(current) then
-        M.last_focus_win = current
-    end
-
-    if valid_win(M.winid) then
-        vim.api.nvim_set_current_win(M.winid)
-        return
-    end
-
-    M.open(M.source)
-
-    if valid_win(M.winid) then
-        vim.api.nvim_set_current_win(M.winid)
-    end
+    pane_window.focus_toggle(M, window_deps())
 end
 
 --- Toggle the pane between normal width and zoom width.
 function M.toggle_zoom()
-    M.zoomed = not M.zoomed
-
-    if not valid_win(M.winid) then
-        return
-    end
-
-    local previous = vim.api.nvim_get_current_win()
-
-    if M.zoomed and previous ~= M.winid and valid_win(previous) then
-        M.last_focus_win = previous
-    end
-
-    if M.active_mode == "markdown" then
-        save_markdown_view()
-    end
-
-    pcall(vim.api.nvim_win_set_width, M.winid, pane_width())
-    set_window_options(M.winid, M.active_mode == "markdown" and "markdown" or "terminal")
-
-    if M.active_mode == "markdown" and valid_buf(M.bufnr) then
-        reflow_pane_buffer(M.bufnr)
-        render_markview(M.bufnr)
-        restore_markdown_view()
-    end
-
-    update_sticky_heading()
-
-    if M.zoomed then
-        vim.api.nvim_set_current_win(M.winid)
-    end
-
-    vim.notify("Pane zoom " .. (M.zoomed and "on" or "off"), vim.log.levels.INFO)
+    pane_window.toggle_zoom(M, window_deps())
 end
 
 --- Return the current text width used for markdown reflow.

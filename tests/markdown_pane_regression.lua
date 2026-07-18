@@ -506,6 +506,123 @@ test("smart gf from markdown pane opens in last non-pane window", function()
     assert(vim.api.nvim_win_get_buf(pane.winid) == pane.bufnr, "pane buffer was replaced")
 end)
 
+test("focus toggle moves between normal window and pane", function()
+    reset_pane()
+
+    local root = root_fixture("focus-toggle-test")
+
+    write(root .. "/docs/doc.md", { "# Doc" })
+    write(root .. "/src/origin.py", { "print('origin')" })
+
+    pane.setup({})
+    vim.cmd.edit(root .. "/src/origin.py")
+
+    local origin_win = vim.api.nvim_get_current_win()
+
+    pane.open(root .. "/docs/doc.md")
+    assert(vim.api.nvim_get_current_win() == origin_win, "open stole focus")
+
+    pane.focus_toggle()
+    assert(vim.api.nvim_get_current_win() == pane.winid, "focus_toggle did not focus pane")
+
+    pane.focus_toggle()
+    assert(vim.api.nvim_get_current_win() == origin_win, "focus_toggle did not return to origin window")
+end)
+
+test("closing and reopening markdown pane restores cursor view", function()
+    reset_pane()
+
+    local root = root_fixture("close-reopen-view-test")
+    local doc = {}
+
+    for index = 1, 80 do
+        table.insert(doc, "Line " .. index)
+    end
+
+    write(root .. "/docs/doc.md", doc)
+    write(root .. "/src/origin.py", { "print('origin')" })
+
+    pane.setup({ auto_reflow = false })
+    vim.cmd.edit(root .. "/src/origin.py")
+    pane.open(root .. "/docs/doc.md")
+    pane.focus_toggle()
+
+    vim.api.nvim_win_set_cursor(pane.winid, { 40, 0 })
+    vim.api.nvim_win_call(pane.winid, function()
+        vim.cmd("normal! zt")
+    end)
+
+    pane.close()
+    assert(not pane.is_open(), "pane did not close")
+
+    pane.open(root .. "/docs/doc.md")
+    assert(vim.api.nvim_win_get_cursor(pane.winid)[1] == 40, "markdown cursor view was not restored")
+end)
+
+test("closing pane preserves running terminal session", function()
+    reset_pane()
+
+    local root = root_fixture("close-terminal-preserve-test")
+
+    write(root .. "/docs/doc.md", { "# Doc" })
+
+    pane.setup({
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    pane.open(root .. "/docs/doc.md")
+
+    local ctx = pane.open_terminal("codex", nil, { root = root, focus = true })
+    local bufnr = ctx.bufnr
+    local job_id = ctx.job_id
+
+    pane.close()
+    assert(not pane.is_open(), "pane did not close")
+    assert(vim.api.nvim_buf_is_valid(bufnr), "terminal buffer was deleted on close")
+
+    local reopened = pane.open_terminal("codex", nil, { root = root, focus = true })
+
+    assert(reopened.bufnr == bufnr, "terminal buffer was not reused")
+    assert(reopened.job_id == job_id, "terminal job was not reused")
+end)
+
+test("markdown and terminal pane window options are mode-specific", function()
+    reset_pane()
+
+    local root = root_fixture("window-options-test")
+
+    write(root .. "/docs/doc.md", { "# Doc" })
+
+    pane.setup({
+        wrap = true,
+        tools = {
+            codex = {
+                label = "Codex",
+                cmd = { "sh", "-c", "sleep 10" },
+                presets = { { name = "default", label = "Default", args = {} } },
+            },
+        },
+    })
+
+    pane.open(root .. "/docs/doc.md")
+
+    assert(vim.api.nvim_get_option_value("number", { win = pane.winid }) == true, "markdown pane number option was off")
+    assert(vim.api.nvim_get_option_value("wrap", { win = pane.winid }) == true, "markdown pane wrap option was off")
+    assert(vim.api.nvim_get_option_value("conceallevel", { win = pane.winid }) == 3, "markdown pane conceallevel was wrong")
+
+    pane.open_terminal("codex", nil, { root = root, focus = true })
+
+    assert(vim.api.nvim_get_option_value("number", { win = pane.winid }) == false, "terminal pane number option was on")
+    assert(vim.api.nvim_get_option_value("wrap", { win = pane.winid }) == false, "terminal pane wrap option was on")
+    assert(vim.api.nvim_get_option_value("conceallevel", { win = pane.winid }) == 0, "terminal pane conceallevel was wrong")
+end)
+
 test("zoom focuses pane and caps markdown text width", function()
     reset_pane()
 
