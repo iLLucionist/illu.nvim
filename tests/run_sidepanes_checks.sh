@@ -3,6 +3,8 @@ set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 PLUGIN_DIR="${SIDEPANES_RUNTIME_PATH:-${HOME}/.local/share/nvim/lazy/sidepanes.nvim}"
+TMP_ROOT="${TMPDIR:-/tmp}"
+TMP_ROOT="${TMP_ROOT%/}"
 
 if [ ! -d "$PLUGIN_DIR/lua/sidepanes" ]; then
     PLUGIN_DIR="$ROOT_DIR"
@@ -14,8 +16,8 @@ run_nvim() {
     name="$1"
     shift
 
-    XDG_CACHE_HOME="/private/tmp/illu-nvim-cache-${name}" \
-        XDG_STATE_HOME="/private/tmp/illu-nvim-state-${name}" \
+    XDG_CACHE_HOME="${TMP_ROOT}/illu-nvim-cache-${name}" \
+        XDG_STATE_HOME="${TMP_ROOT}/illu-nvim-state-${name}" \
         SIDEPANES_RUNTIME_PATH="$PLUGIN_DIR" \
         nvim --headless "$@"
 }

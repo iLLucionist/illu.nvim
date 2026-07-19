@@ -11,8 +11,16 @@ local sidepanes = require("sidepanes")
 local pane = sidepanes._state()
 local util = require("sidepanes.util")
 
-local root = "/private/tmp/illu-real-cli-smoke"
+local function tmp_path(name)
+    local root = vim.env.SIDEPANES_TEST_TMPDIR or vim.env.TMPDIR or "/tmp"
+    root = vim.loop.fs_realpath(root) or root
 
+    return root:gsub("/+$", "") .. "/" .. name
+end
+
+local root = tmp_path("illu-real-cli-smoke")
+
+vim.fn.delete(root, "rf")
 vim.fn.mkdir(root .. "/.git", "p")
 vim.fn.writefile({ "# Real CLI smoke" }, root .. "/doc.md")
 

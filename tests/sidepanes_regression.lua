@@ -36,6 +36,13 @@ local function mkdir(path)
     vim.fn.mkdir(path, "p")
 end
 
+local function tmp_path(name)
+    local root = vim.env.SIDEPANES_TEST_TMPDIR or vim.env.TMPDIR or "/tmp"
+    root = vim.loop.fs_realpath(root) or root
+
+    return root:gsub("/+$", "") .. "/" .. name
+end
+
 local function write(path, lines)
     vim.fn.writefile(lines, path)
 end
@@ -227,8 +234,9 @@ local function reset_pane()
 end
 
 local function root_fixture(name)
-    local root = "/private/tmp/illu-" .. name
+    local root = tmp_path("illu-" .. name)
 
+    vim.fn.delete(root, "rf")
     mkdir(root .. "/.git")
     mkdir(root .. "/docs")
     mkdir(root .. "/src")
@@ -332,6 +340,7 @@ end)
 
 test("public switch entry helper normalizes strings, maps, and aliases", function()
     reset_pane()
+    local switch_root = tmp_path("illu-switch-entry-root")
 
     pane.setup({
         tools = {
@@ -358,7 +367,7 @@ test("public switch entry helper normalizes strings, maps, and aliases", functio
     local table_entry = sidepanes.make_switch_entry({
         tool = "codex",
         preset = "Review",
-        root = "/private/tmp/illu-switch-entry-root",
+        root = switch_root,
         focus = false,
     })
     local ipython_entry = sidepanes.make_switch_entry({ target = "i" })
@@ -368,7 +377,7 @@ test("public switch entry helper normalizes strings, maps, and aliases", functio
     assert(uppercase_entry.tool_name == "codex", "Codex target did not normalize to codex")
     assert(table_entry.tool_name == "codex", "table tool did not normalize")
     assert(table_entry.preset_name == "review", "preset label did not normalize to preset name")
-    assert(table_entry.root == "/private/tmp/illu-switch-entry-root", "switch entry lost root")
+    assert(table_entry.root == switch_root, "switch entry lost root")
     assert(table_entry.focus == false, "switch entry lost focus override")
     assert(ipython_entry.tool_name == "ipython", "i alias did not normalize to ipython")
 
@@ -456,6 +465,7 @@ end)
 test("pane-local mappings are configurable", function()
     local bufnr = vim.api.nvim_create_buf(false, true)
     local calls = {}
+    local map_root = tmp_path("illu-custom-pane-map-root")
 
     local_maps.setup(bufnr, {
         ask_current_coding_agent = function(tool_name, opts)
@@ -488,7 +498,7 @@ test("pane-local mappings are configurable", function()
             }
         end,
         pane_root = function()
-            return "/private/tmp/illu-custom-pane-map-root"
+            return map_root
         end,
         show_markdown = function()
             calls.markdown = true
@@ -528,7 +538,7 @@ test("pane-local mappings are configurable", function()
     assert(calls.markdown == true, "custom markdown-viewer map did not call show_markdown")
     call_map(bufnr, "mx")
     assert(calls.open_terminal.tool_name == "codex", "custom Codex pane map used wrong tool")
-    assert(calls.open_terminal.opts.root == "/private/tmp/illu-custom-pane-map-root", "custom Codex pane map lost pane root")
+    assert(calls.open_terminal.opts.root == map_root, "custom Codex pane map lost pane root")
     call_map(bufnr, "mc")
     assert(calls.open_terminal.tool_name == "claude", "custom Claude pane map used wrong tool")
     call_map(bufnr, "mi")
@@ -2056,7 +2066,7 @@ test("public IPython send captures current line through terminal deps", function
     reset_pane()
 
     local root = root_fixture("ipython-send-test")
-    local out = "/private/tmp/illu-ipython-send.txt"
+    local out = tmp_path("illu-ipython-send.txt")
 
     pcall(vim.fn.delete, out)
     write(root .. "/src/origin.py", {
@@ -2092,7 +2102,7 @@ test("visual IPython send exits visual mode after capture", function()
     reset_pane()
 
     local root = root_fixture("ipython-visual-exit-test")
-    local out = "/private/tmp/illu-ipython-visual-exit.txt"
+    local out = tmp_path("illu-ipython-visual-exit.txt")
 
     pcall(vim.fn.delete, out)
     write(root .. "/src/origin.py", {
@@ -2190,7 +2200,7 @@ test("question quit cancels unwritten changes and restores origin", function()
     reset_pane()
 
     local root = root_fixture("question-cancel-test")
-    local out = "/private/tmp/illu-question-cancel.txt"
+    local out = tmp_path("illu-question-cancel.txt")
 
     pcall(vim.fn.delete, out)
     write(root .. "/src/origin.py", { "print('origin')" })
@@ -2229,7 +2239,7 @@ test("question write then quit sends prompt and focuses terminal", function()
     reset_pane()
 
     local root = root_fixture("question-send-test")
-    local out = "/private/tmp/illu-question-send.txt"
+    local out = tmp_path("illu-question-send.txt")
 
     pcall(vim.fn.delete, out)
     write(root .. "/src/origin.py", { "print('origin')" })
@@ -2315,7 +2325,7 @@ test("question write without quit does not send", function()
     reset_pane()
 
     local root = root_fixture("question-write-only-test")
-    local out = "/private/tmp/illu-question-write-only.txt"
+    local out = tmp_path("illu-question-write-only.txt")
 
     pcall(vim.fn.delete, out)
     write(root .. "/src/origin.py", { "print('origin')" })
@@ -2353,7 +2363,7 @@ test("asking with a new preset reuses the same agent session and sends a model s
     reset_pane()
 
     local root = root_fixture("model-switch-test")
-    local out = "/private/tmp/illu-model-switch.txt"
+    local out = tmp_path("illu-model-switch.txt")
 
     pcall(vim.fn.delete, out)
     write(root .. "/src/origin.py", { "print('origin')" })
@@ -3293,7 +3303,7 @@ test("shutdown sends configured exit commands", function()
     reset_pane()
 
     local root = root_fixture("shutdown-test")
-    local out = "/private/tmp/illu-pane-exit-commands.txt"
+    local out = tmp_path("illu-pane-exit-commands.txt")
 
     pcall(vim.fn.delete, out)
 
