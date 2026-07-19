@@ -10,7 +10,7 @@ Claude, and IPython in one reusable side pane.
 Docs:
 
 - Neovim help: `:help sidepanes`
-- Plugin repository: [iLLucionist/sidepanes.nvim](https://github.com/iLLucionist/sidepanes.nvim/tree/plugin-extraction)
+- Plugin repository: [iLLucionist/sidepanes.nvim](https://github.com/iLLucionist/sidepanes.nvim)
 
 Quick commands:
 

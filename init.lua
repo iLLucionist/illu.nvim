@@ -120,7 +120,6 @@ require("lazy").setup({
     "nyngwang/NeoZoom.lua",
     {
         "iLLucionist/sidepanes.nvim",
-        branch = "plugin-extraction",
         lazy = false,
     },
     -- TAILWIND
