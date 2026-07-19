@@ -260,6 +260,8 @@ test("public facade hides mutable state and exposes config copy", function()
         "pick",
         "pick_headings",
         "open_terminal",
+        "show_last_terminal",
+        "toggle_markdown_terminal",
         "open_ipython",
         "send_ipython",
         "clear_ipython",
@@ -1987,10 +1989,10 @@ test("pane switch picker selects markdown and shortcut entries without enter", f
     assert(vim.api.nvim_win_get_buf(pane.winid) == pane.bufnr, "picker 0 did not restore markdown buffer")
 end)
 
-test("show last agent falls back to Codex when no terminal was remembered", function()
+test("show last terminal falls back to Codex when no terminal was remembered", function()
     reset_pane()
 
-    local root = root_fixture("last-agent-fallback-test")
+    local root = root_fixture("last-terminal-fallback-test")
 
     write(root .. "/docs/doc.md", { "# Doc" })
     pane.setup({
@@ -2004,16 +2006,16 @@ test("show last agent falls back to Codex when no terminal was remembered", func
     })
     pane.open(root .. "/docs/doc.md")
 
-    pane.show_last_agent({ root = root, focus = true })
+    pane.show_last_terminal({ root = root, focus = true })
 
-    assert(pane.active_mode == "codex", "show_last_agent did not fall back to Codex")
-    assert(vim.api.nvim_get_current_win() == pane.winid, "show_last_agent focus option did not focus pane")
+    assert(pane.active_mode == "codex", "show_last_terminal did not fall back to Codex")
+    assert(vim.api.nvim_get_current_win() == pane.winid, "show_last_terminal focus option did not focus pane")
 end)
 
-test("toggle markdown agent flips between markdown and last remembered terminal", function()
+test("toggle markdown terminal flips between markdown and last remembered terminal", function()
     reset_pane()
 
-    local root = root_fixture("toggle-agent-test")
+    local root = root_fixture("toggle-terminal-test")
 
     write(root .. "/docs/doc.md", { "# Doc" })
     pane.setup({
@@ -2036,11 +2038,18 @@ test("toggle markdown agent flips between markdown and last remembered terminal"
     pane.open_terminal("ipython", nil, { root = root, focus = true })
     pane.show_markdown()
 
-    pane.toggle_markdown_agent()
+    pane.toggle_markdown_terminal()
     assert(pane.active_mode == "ipython", "toggle did not return to last remembered terminal")
 
-    pane.toggle_markdown_agent()
+    pane.toggle_markdown_terminal()
     assert(pane.active_mode == "markdown", "toggle did not return to markdown")
+end)
+
+test("old terminal helper names remain compatibility aliases", function()
+    assert(type(sidepanes.show_last_agent) == "function", "show_last_agent is not callable")
+    assert(type(sidepanes.toggle_markdown_agent) == "function", "toggle_markdown_agent is not callable")
+    assert(pane.show_last_agent == pane.show_last_terminal, "show_last_agent is not an internal alias")
+    assert(pane.toggle_markdown_agent == pane.toggle_markdown_terminal, "toggle_markdown_agent is not an internal alias")
 end)
 
 test("public IPython send captures current line through terminal deps", function()
