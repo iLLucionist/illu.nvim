@@ -59,11 +59,14 @@ sidepanes.setup({
 })
 ```
 
-Run checks before Sidepanes refactors:
+Run the local consumer smoke after changing the Sidepanes lazy.nvim spec:
 
 ```sh
 tests/run_sidepanes_checks.sh
 ```
+
+The full Sidepanes regression suite lives in
+[iLLucionist/sidepanes.nvim](https://github.com/iLLucionist/sidepanes.nvim).
 
 ## Markdown Reflow
 

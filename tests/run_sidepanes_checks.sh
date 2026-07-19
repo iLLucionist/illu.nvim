@@ -2,12 +2,14 @@
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-PLUGIN_DIR="${SIDEPANES_RUNTIME_PATH:-${HOME}/.local/share/nvim/lazy/sidepanes.nvim}"
+PLUGIN_DIR="${ILLU_SIDEPANES_RUNTIME_PATH:-${HOME}/.local/share/nvim/lazy/sidepanes.nvim}"
 TMP_ROOT="${TMPDIR:-/tmp}"
 TMP_ROOT="${TMP_ROOT%/}"
 
 if [ ! -d "$PLUGIN_DIR/lua/sidepanes" ]; then
-    PLUGIN_DIR="$ROOT_DIR"
+    printf 'missing installed sidepanes.nvim runtime: %s\n' "$PLUGIN_DIR" >&2
+    printf 'run :Lazy sync sidepanes.nvim from Neovim, then retry\n' >&2
+    exit 1
 fi
 
 printf 'sidepanes runtime: %s\n' "$PLUGIN_DIR"
@@ -18,28 +20,11 @@ run_nvim() {
 
     XDG_CACHE_HOME="${TMP_ROOT}/illu-nvim-cache-${name}" \
         XDG_STATE_HOME="${TMP_ROOT}/illu-nvim-state-${name}" \
-        SIDEPANES_RUNTIME_PATH="$PLUGIN_DIR" \
+        SIDEPANES_EXPECTED_RUNTIME_PATH="$PLUGIN_DIR" \
         nvim --headless "$@"
 }
 
-run_nvim sidepanes-regression \
-    -u NONE \
-    -c "luafile $ROOT_DIR/tests/sidepanes_regression.lua" \
-    -c 'qa!'
-
-run_nvim sidepanes-audit-smoke \
+run_nvim sidepanes-integration-smoke \
     -u "$ROOT_DIR/init.lua" \
-    -c "luafile $ROOT_DIR/tests/sidepanes_audit_smoke.lua" \
+    -c "luafile $ROOT_DIR/tests/sidepanes_integration_smoke.lua" \
     -c 'qa!'
-
-run_nvim sidepanes-checkhealth-smoke \
-    -u "$ROOT_DIR/init.lua" \
-    -c "luafile $ROOT_DIR/tests/sidepanes_checkhealth_smoke.lua" \
-    -c 'qa!'
-
-run_nvim sidepanes-real-cli-smoke \
-    -u NONE \
-    -c "luafile $ROOT_DIR/tests/sidepanes_real_cli_smoke.lua" \
-    -c 'qa!'
-
-printf '%s\n' 'sidepanes checks passed'
