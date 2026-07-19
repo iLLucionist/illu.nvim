@@ -445,8 +445,13 @@ Current verification:
 
 - Headless startup asserted `require("sidepanes")` loads from
   `/Users/maximl/.local/share/nvim/lazy/sidepanes.nvim/lua/sidepanes/init.lua`.
+- `:help sidepanes` resolves to
+  `/Users/maximl/.local/share/nvim/lazy/sidepanes.nvim/doc/sidepanes.txt`.
 - Existing `tests/run_sidepanes_checks.sh` passes with the GitHub-installed
   plugin path active.
+- `tests/run_sidepanes_checks.sh` now selects the lazy-installed
+  `sidepanes.nvim` runtime path first via `SIDEPANES_RUNTIME_PATH`, falling
+  back to the local repo only when the installed plugin is absent.
 - Local `lua/sidepanes/**` has not been removed.
 
 #### 5.7 Dependency Contract Pass

@@ -5,7 +5,11 @@ Does: Runs Neovim's health command, inspects the generated report buffer, and fa
 Architecture: Complements sidepanes_audit_smoke.lua by testing Neovim's command-facing health integration instead of calling the health module directly.
 ]]
 
-vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
+local plugin_root = vim.env.SIDEPANES_RUNTIME_PATH
+
+if plugin_root and plugin_root ~= "" then
+    vim.opt.runtimepath:prepend(plugin_root)
+end
 
 vim.cmd("checkhealth sidepanes")
 

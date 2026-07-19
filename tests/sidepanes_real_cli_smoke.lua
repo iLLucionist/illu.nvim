@@ -1,4 +1,10 @@
-vim.opt.runtimepath:append("/Users/maximl/.config/nvim/illu.nvim")
+local plugin_root = vim.env.SIDEPANES_RUNTIME_PATH
+
+if not plugin_root or plugin_root == "" then
+    plugin_root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
+end
+
+vim.opt.runtimepath:append(plugin_root)
 
 local defaults = require("sidepanes.defaults")
 local sidepanes = require("sidepanes")

@@ -5,7 +5,11 @@ Does: Verifies configured commands, forbidden legacy commands, global mappings, 
 Architecture: Complements the focused regression suite with a full-config smoke test that catches wiring regressions.
 ]]
 
-local plugin_root = "/Users/maximl/.config/nvim/illu.nvim"
+local plugin_root = vim.env.SIDEPANES_RUNTIME_PATH
+
+if not plugin_root or plugin_root == "" then
+    plugin_root = vim.fn.fnamemodify(debug.getinfo(1, "S").source:sub(2), ":p:h:h")
+end
 
 vim.opt.runtimepath:append(plugin_root)
 
