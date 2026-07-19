@@ -215,20 +215,25 @@ Acceptance:
 
 #### 5.3 Split `sidepanes.nvim`
 
+Status: next major pass.
+
 Create a dedicated Sidepanes plugin repo:
 
 ```text
 sidepanes.nvim/
+  .gitignore
   README.md
   LICENSE
+  CHANGELOG.md        # optional before first public release
   doc/
     sidepanes.txt
     tags
   lua/
     sidepanes/
       init.lua
-      ...
+    ...
   tests/
+    run_checks.sh
     run_sidepanes_checks.sh
     sidepanes_regression.lua
     ...
@@ -258,6 +263,66 @@ Acceptance:
 
 - `sidepanes.nvim` runs its checks as a standalone repo.
 - `illu.nvim` can install it from GitHub and keep the current Sidepanes workflow.
+
+Concrete migration sequence:
+
+1. Clone the new GitHub repo into a sibling development folder, for example:
+
+   ```sh
+   git clone git@github.com:iLLucionist/sidepanes.nvim.git ../sidepanes.nvim
+   ```
+
+2. Copy only plugin-owned files from `illu.nvim` into the new repo:
+
+   ```text
+   lua/sidepanes/**
+   doc/sidepanes.txt
+   doc/sidepanes.md
+   doc/tags
+   tests/sidepanes_*.lua
+   tests/run_sidepanes_checks.sh
+   README.md content, rewritten for plugin users
+   ```
+
+3. Do not copy personal config or unrelated local modules:
+
+   ```text
+   init.lua
+   lua/svelte_*
+   local personal plugin manager config
+   local project-specific files
+   ```
+
+4. Rename or add portable wrappers:
+
+   ```text
+   tests/run_checks.sh
+   tests/run_checks.sh fast
+   tests/run_checks.sh full
+   ```
+
+5. Make tests discover the repo root dynamically instead of appending the
+   `illu.nvim` path.
+
+6. Run the standalone repo tests from inside `sidepanes.nvim`.
+
+7. Commit the standalone repo.
+
+8. Add the GitHub plugin to personal `illu.nvim` using the plugin manager.
+
+9. Prove the personal workflow still works while the local source is still
+   available as backup.
+
+10. Remove local `lua/sidepanes/**` from `illu.nvim` only after the GitHub
+    install path has passed acceptance testing.
+
+First extraction commit target:
+
+- Portable plugin file tree exists in `sidepanes.nvim`.
+- README is written for external users, not for `illu.nvim`.
+- `:help sidepanes` works.
+- `tests/run_checks.sh fast` passes without `illu.nvim` in runtimepath.
+- `tests/run_checks.sh full` passes in the normal local environment.
 
 #### 5.4 Docs Contract Pass
 
