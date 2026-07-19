@@ -1,8 +1,8 @@
 --[[
-markdown_reflow
+sidepanes.markdown_reflow
 Purpose: Reflow Markdown buffers with an internal formatter or an optional external formatter.
 Does: Preserves protected regions, optionally masks tables for external tools, computes sensible widths, and registers optional commands/mappings.
-Architecture: Companion markdown utility used directly from user config and indirectly by Sidepanes render logic.
+Architecture: Internal Sidepanes Markdown utility kept behind a narrow module boundary so it can be extracted into a standalone plugin later.
 ]]
 
 local M = {
@@ -117,7 +117,7 @@ local function mask_table_blocks(lines, opts)
                 i = i + 1
             end
 
-            local token = "<!-- illu-nvim-reflow-table-" .. tostring(#blocks + 1) .. " -->"
+            local token = "<!-- sidepanes-reflow-table-" .. tostring(#blocks + 1) .. " -->"
 
             table.insert(blocks, {
                 token = token,
@@ -151,7 +151,8 @@ local function restore_table_blocks(lines, blocks)
     local restored = {}
 
     for _, line in ipairs(lines) do
-        local token = line:match("^%s*(<!%-%- illu%-nvim%-reflow%-table%-%d+ %-%->)%s*$")
+        local token = line:match("^%s*(<!%-%- sidepanes%-reflow%-table%-%d+ %-%->)%s*$")
+            or line:match("^%s*(<!%-%- illu%-nvim%-reflow%-table%-%d+ %-%->)%s*$")
         local block = token and by_token[token] or nil
 
         if block then

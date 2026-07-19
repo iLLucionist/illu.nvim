@@ -535,7 +535,7 @@ sidepanes.setup({
     },
 })
 
-local markdown_reflow = require("markdown_reflow")
+local markdown_reflow = require("sidepanes.markdown_reflow")
 
 markdown_reflow.setup({
     external_reflow_cmd = markdown_reflow_cmd,

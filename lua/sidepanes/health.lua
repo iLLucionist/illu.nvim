@@ -176,6 +176,7 @@ local function check_dependencies()
     check_module("markview", "markview", false)
     check_module("telescope", "telescope.nvim", false)
     check_module("sidepanes.smart_gf", "built-in sidepanes.smart_gf", true)
+    check_module("sidepanes.markdown_reflow", "built-in sidepanes.markdown_reflow", true)
 
     if dependencies.has_parser("markdown") then
         ok("Treesitter markdown parser found")

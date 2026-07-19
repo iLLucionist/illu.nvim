@@ -30,7 +30,7 @@ function M.reflow_buffer(state, deps, bufnr, opts)
         return
     end
 
-    local ok, markdown_reflow = pcall(require, "markdown_reflow")
+    local ok, markdown_reflow = pcall(require, "sidepanes.markdown_reflow")
 
     if not ok then
         return

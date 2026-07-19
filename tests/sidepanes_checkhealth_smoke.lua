@@ -13,6 +13,10 @@ local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
 local report = table.concat(lines, "\n")
 
 assert(report:find("sidepanes.nvim loaded", 1, true), "health report did not load sidepanes:\n" .. report)
+assert(
+    report:find("built-in sidepanes.markdown_reflow module found", 1, true),
+    "health report did not include built-in markdown_reflow module:\n" .. report
+)
 assert(report:find("Codex presets configured: 12", 1, true), "health report did not include Codex presets:\n" .. report)
 assert(report:find("Command registered: :Sidepanes", 1, true), "health report did not include root command:\n" .. report)
 assert(report:find("Global mapping registered (n, x): <leader>pl", 1, true), "health report did not include global mapping modes:\n" .. report)

@@ -207,8 +207,11 @@ Pane-local mappings are installed inside Sidepanes buffers:
     ac               ask Claude from visual selection
 <
 
-Pane-local `gf` is implemented by `sidepanes.smart_gf`. The old
-`require("smart_gf")` module remains as a compatibility shim.
+Pane-local `gf` is implemented by `sidepanes.smart_gf`.
+
+Markdown reflow is implemented by `sidepanes.markdown_reflow`. Sidepanes uses
+that module path internally so the reflow code can be extracted later without
+changing Sidepanes render logic.
 
 ==============================================================================
 CONFIGURATION                                       *sidepanes-configuration*

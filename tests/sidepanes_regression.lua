@@ -16,7 +16,7 @@ local nvim_tree_integration = require("sidepanes.integrations.nvim_tree")
 local presets = require("sidepanes.presets")
 local util = require("sidepanes.util")
 local validation = require("sidepanes.validation")
-local markdown_reflow = require("markdown_reflow")
+local markdown_reflow = require("sidepanes.markdown_reflow")
 local sidepanes = require("sidepanes")
 local pane = sidepanes._state()
 
@@ -2392,10 +2392,6 @@ test("asking with a new preset reuses the same agent session and sends a model s
     assert(current[1].preset_name == "two", "model picker current preset did not follow switch")
 end)
 
-test("smart gf compatibility shim re-exports sidepanes implementation", function()
-    assert(require("smart_gf") == require("sidepanes.smart_gf"), "smart_gf shim did not re-export sidepanes.smart_gf")
-end)
-
 test("smart gf from sidepanes opens in last non-pane window", function()
     reset_pane()
 
@@ -3270,7 +3266,7 @@ test("smart gf from IPython pane opens traceback file and line outside pane", fu
     assert(target_line, table.concat(lines, "\n"))
 
     vim.api.nvim_win_set_cursor(pane.winid, { target_line, 8 })
-    require("smart_gf").open()
+    require("sidepanes.smart_gf").open()
 
     assert(vim.api.nvim_get_current_win() == origin_win, "gf did not switch to origin window")
     assert(vim.api.nvim_buf_get_name(0) == root .. "/src/target.py", "opened wrong file")

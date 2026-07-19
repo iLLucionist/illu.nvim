@@ -158,6 +158,13 @@ end
 
 for _, path in ipairs(vim.fn.globpath(plugin_root .. "/lua/sidepanes", "*.lua", false, true)) do
     assert_module_comment(path)
+
+    local source = table.concat(vim.fn.readfile(path), "\n")
+
+    assert(
+        not source:find('require%("markdown_reflow"%)'),
+        "sidepanes runtime module should not require legacy markdown_reflow shim: " .. path
+    )
 end
 
 local pane_config = sidepanes.get_config()
@@ -184,6 +191,10 @@ for _, report in ipairs(reports) do
 end
 
 assert(has_report(reports, "ok", "sidepanes.nvim loaded"), "health did not report sidepanes loaded")
+assert(
+    has_report(reports, "ok", "built-in sidepanes.markdown_reflow module found"),
+    "health did not report built-in markdown_reflow module"
+)
 assert(has_report(reports, "ok", "Codex presets configured: 12"), "health did not report Codex presets")
 assert(has_report(reports, "ok", "Command registered: :SidepanesSwitch"), "health did not report SidepanesSwitch")
 assert(has_report(reports, "ok", "Global mapping registered (n): <leader>pp"), "health did not report normal global mapping mode")

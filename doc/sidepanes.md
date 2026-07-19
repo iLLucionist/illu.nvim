@@ -434,8 +434,11 @@ Optional dependencies are tied to features:
 | `claude` | Claude terminal tool. |
 | `ipython` / `uv` | IPython pane. |
 
-Pane-local `gf` is built in as `sidepanes.smart_gf`. The old
-`require("smart_gf")` module remains as a compatibility shim.
+Pane-local `gf` is built in as `sidepanes.smart_gf`.
+
+Markdown reflow is built in as `sidepanes.markdown_reflow`. Sidepanes itself
+requires that module path so the reflow implementation has a clear boundary if
+it is extracted later.
 
 Setup validation is enabled by default and warns for malformed config or
 missing dependencies implied by enabled features.

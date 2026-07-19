@@ -39,8 +39,8 @@ Recently completed or in progress:
 - The audit smoke test enforces top-level Purpose/Does/Architecture comments for all `lua/sidepanes/*.lua` modules.
 - `doc/sidepanes.txt` provides `:help sidepanes`; `doc/sidepanes.md` carries the longer reference.
 - `:Sidepanes help` opens the Neovim help page, falling back to the subcommand summary if helptags are unavailable.
-- Pane-local smart `gf` is owned by `lua/sidepanes/smart_gf.lua`; `lua/smart_gf/init.lua` remains a compatibility shim.
-- `markdown_reflow` remains a separate companion utility because it has standalone commands, mappings, and use outside Sidepanes.
+- Pane-local smart `gf` is owned by `lua/sidepanes/smart_gf.lua`; the old `lua/smart_gf` shim has been removed.
+- Markdown reflow is owned by `lua/sidepanes/markdown_reflow.lua`; the old `lua/markdown_reflow` shim has been removed.
 - `:checkhealth sidepanes` reports global and pane-local mapping modes.
 
 ## Roadmap
@@ -140,27 +140,34 @@ Acceptance:
 
 Status: in progress.
 
-Extract the local plugin work from `illu.nvim` into proper standalone GitHub repositories and make `illu.nvim` consume those plugins like any other Neovim config.
+Extract the local plugin work from `illu.nvim` into a proper standalone GitHub repository and make `illu.nvim` consume it like any other Neovim config.
 
-Target repositories:
+Target repository:
 
 - `sidepanes.nvim`
-- `markdown-reflow.nvim`
 
-Keep `illu.nvim` as the personal configuration repo that installs and configures both plugins from GitHub.
+Keep `illu.nvim` as the personal configuration repo that installs and configures Sidepanes from GitHub.
+
+Current packaging decision:
+
+- Ship Markdown reflow inside `sidepanes.nvim` for now as `sidepanes.markdown_reflow`.
+- Keep the reflow implementation isolated behind its own module boundary so it can be extracted into `markdown-reflow.nvim` later if that becomes useful.
+- Use only `sidepanes.markdown_reflow` as the supported require path.
 
 Completed refinements:
 
 - Moved pane-local smart `gf` into `lua/sidepanes/smart_gf.lua`.
-- Kept `lua/smart_gf/init.lua` as a compatibility shim for older config/tests.
 - Removed `smart_gf` from external Sidepanes dependency validation.
 - Made `:checkhealth sidepanes` report global and pane-local mapping modes.
+- Moved Markdown reflow implementation into `lua/sidepanes/markdown_reflow.lua`.
+- Made Sidepanes render logic require `sidepanes.markdown_reflow` directly.
+- Removed the legacy `lua/smart_gf` and `lua/markdown_reflow` shim folders.
 
 Possible work:
 
 #### 5.1 Extraction Boundary Audit
 
-Prove `lua/sidepanes/**` and `lua/markdown_reflow/**` can stand on their own outside `illu.nvim`.
+Prove `lua/sidepanes/**` can stand on its own outside `illu.nvim`.
 
 Check for:
 
@@ -175,29 +182,23 @@ Check for:
 Acceptance:
 
 - The `sidepanes` module tree can be copied into another Neovim config and loaded with `require("sidepanes").setup(...)`.
-- The `markdown_reflow` module tree can be copied into another Neovim config and loaded with `require("markdown_reflow").setup(...)`.
+- Markdown reflow works through `require("sidepanes.markdown_reflow").setup(...)`.
 - Personal `init.lua` remains only a consumer of the public setup/config surface.
 
-#### 5.2 Split `markdown-reflow.nvim`
+#### 5.2 Fold Markdown Reflow Into Sidepanes
 
-Create a dedicated Markdown reflow plugin repo:
+Status: completed in the local plugin tree.
+
+Keep Markdown reflow as a dedicated Sidepanes submodule:
 
 ```text
-markdown-reflow.nvim/
-  README.md
-  LICENSE
-  doc/
-    markdown-reflow.txt
-    tags
+sidepanes.nvim/
   lua/
-    markdown_reflow/
-      init.lua
-  tests/
-    run_markdown_reflow_checks.sh
-    markdown_reflow_regression.lua
+    sidepanes/
+      markdown_reflow.lua
 ```
 
-Keep in this repo:
+Keep in this submodule:
 
 - Internal Markdown reflow.
 - External formatter support, including `mdfmt`.
@@ -208,8 +209,9 @@ Keep in this repo:
 
 Acceptance:
 
-- `markdown-reflow.nvim` runs its own checks without loading `sidepanes`.
-- `illu.nvim` can install it from GitHub and keep the existing `<leader>mR` workflow.
+- Sidepanes render logic uses `sidepanes.markdown_reflow`, not `markdown_reflow`.
+- `illu.nvim` can install one GitHub plugin, `sidepanes.nvim`, and keep the existing `<leader>mR` workflow.
+- The module boundary remains clean enough that a later extraction to `markdown-reflow.nvim` would mostly move this file and add a deliberate compatibility boundary.
 
 #### 5.3 Split `sidepanes.nvim`
 
@@ -238,19 +240,19 @@ Keep in this repo:
 - Codex, Claude, and IPython pane support.
 - Ask prompt editor workflow.
 - `sidepanes.smart_gf`.
+- `sidepanes.markdown_reflow`.
 - Docs, health checks, defaults, config normalization, presets, mappings, and commands.
 
 Do not keep in this repo:
 
 - Personal `init.lua`.
 - Unrelated local modules such as `svelte_*`.
-- The Markdown reflow implementation itself, except as an optional dependency/integration.
 
 Current leaning:
 
 - Do not add `plugin/sidepanes.lua` initially.
 - Keep Sidepanes setup-driven rather than auto-registering commands/mappings on runtimepath load.
-- Depend softly on `markdown-reflow.nvim`: use `pcall(require, "markdown_reflow")`, health warnings, and graceful degradation if missing.
+- Keep Markdown reflow built in and require it as `sidepanes.markdown_reflow`.
 
 Acceptance:
 
@@ -272,8 +274,8 @@ Acceptance:
 - Every Sidepanes public API function appears in Sidepanes help/docs.
 - Every Sidepanes default mapping key appears in Sidepanes help/docs.
 - Every Sidepanes config group appears in Sidepanes help/docs.
-- Every Markdown Reflow command/config/mapping appears in Markdown Reflow help/docs.
-- Help tags remain valid after doc changes in both repos.
+- Every built-in Markdown Reflow command/config/mapping appears in Sidepanes help/docs.
+- Help tags remain valid after doc changes.
 
 #### 5.5 Portable Test / CI Wrapper
 
@@ -285,7 +287,6 @@ Possible work:
 - Resolve repo root dynamically.
 - Exit nonzero on every failed subcheck.
 - Test `:help sidepanes` in `sidepanes.nvim`.
-- Test `:help markdown-reflow` in `markdown-reflow.nvim`.
 - Test `:checkhealth sidepanes`.
 - Test module top-level comments.
 - Consider `fast` and `full` modes.
@@ -307,19 +308,23 @@ Full checks:
 
 - Everything in fast.
 - Real Codex/Claude CLI smoke for Sidepanes when executables exist.
-- External formatter smoke for Markdown Reflow when `mdfmt` exists.
+- External formatter smoke for built-in Markdown reflow when `mdfmt` exists.
 
 #### 5.6 Update `illu.nvim` To Consume GitHub Plugins
 
-After both repos work locally, update personal config to install them from GitHub.
+After the standalone repo works locally, update personal config to install it from GitHub.
 
 Target lazy.nvim shape:
 
 ```lua
 {
-  "yourname/markdown-reflow.nvim",
+  "yourname/sidepanes.nvim",
   config = function()
-    require("markdown_reflow").setup({
+    require("sidepanes").setup({
+      -- current personal Sidepanes config
+    })
+
+    require("sidepanes.markdown_reflow").setup({
       external_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" },
       external_reflow_protect_tables = true,
       commands = true,
@@ -327,25 +332,13 @@ Target lazy.nvim shape:
     })
   end,
 }
-
-{
-  "yourname/sidepanes.nvim",
-  dependencies = {
-    "yourname/markdown-reflow.nvim",
-  },
-  config = function()
-    require("sidepanes").setup({
-      -- current personal Sidepanes config
-    })
-  end,
-}
 ```
 
 Acceptance:
 
-- `illu.nvim` no longer needs local `lua/sidepanes/**` or `lua/markdown_reflow/**` source.
+- `illu.nvim` no longer needs local `lua/sidepanes/**` source.
 - Existing mappings and commands still work from the GitHub-installed plugins.
-- Existing Sidepanes and Markdown Reflow tests pass before removing local source.
+- Existing Sidepanes and Markdown reflow tests pass before removing local source.
 
 #### 5.7 Dependency Contract Pass
 
@@ -362,17 +355,16 @@ For each feature document and test:
 
 Specific extraction decision:
 
-- `markdown_reflow` becomes a standalone plugin dependency for Sidepanes reflow behavior.
-- Sidepanes should degrade gracefully if `markdown_reflow` is missing.
+- `sidepanes.markdown_reflow` is built in for Sidepanes reflow behavior.
+- Later extraction should be possible by moving `sidepanes.markdown_reflow` into its own repo and making Sidepanes require the external module through one compatibility boundary.
 - `sidepanes.smart_gf` stays built into `sidepanes.nvim`.
 
 #### 5.8 Compatibility And Deprecation Cleanup
 
-Decide how long compatibility shims remain.
+Decide how long older public names and aliases remain.
 
 Questions:
 
-- Should `require("smart_gf")` remain available in `sidepanes.nvim`, or only in `illu.nvim` during migration?
 - Should old flat Sidepanes config keys remain permanently supported?
 - Should command aliases be documented as stable or convenience-only?
 
@@ -385,9 +377,9 @@ Possible work:
 - Add install examples for `lazy.nvim`.
 - Add `CHANGELOG.md`.
 - Decide whether versioning matters.
-- Decide support policy for compatibility shims such as `smart_gf`.
+- Decide support policy for old flat config keys and convenience command aliases.
 - Add a minimal GitHub Actions workflow for headless Neovim tests.
-- Consider separate release notes for `sidepanes.nvim` and `markdown-reflow.nvim`.
+- Consider a future note that Markdown reflow may later split out into `markdown-reflow.nvim`.
 
 ### 6. Naming And API Cleanup Later
 

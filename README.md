@@ -65,11 +65,12 @@ tests/run_sidepanes_checks.sh
 
 ## Markdown Reflow
 
-Standalone Markdown reflow commands and mappings are configured through
-`markdown_reflow`:
+Markdown reflow is currently shipped inside Sidepanes as
+`sidepanes.markdown_reflow`. It is still isolated behind that module path so it
+can become its own plugin later without disturbing Sidepanes internals.
 
 ```lua
-require("markdown_reflow").setup({
+require("sidepanes.markdown_reflow").setup({
   external_reflow_cmd = { "mdfmt", "--stdin", "--width", "{width}", "--wrap", "always" },
   external_reflow_protect_tables = true,
   commands = true,
