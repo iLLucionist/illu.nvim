@@ -1,17 +1,16 @@
 # illu.nvim
 
-Lua-based Neovim configuration and local plugins.
+Lua-based Neovim configuration and small local helpers.
 
 ## Sidepanes
 
-`sidepanes.nvim` keeps a Markdown viewer, Codex, Claude, and IPython in one
-reusable side pane.
+`sidepanes.nvim` is installed from GitHub and keeps a Markdown viewer, Codex,
+Claude, and IPython in one reusable side pane.
 
 Docs:
 
 - Neovim help: `:help sidepanes`
-- Markdown reference: [doc/sidepanes.md](doc/sidepanes.md)
-- Roadmap: [lua/sidepanes/ROADMAP.md](lua/sidepanes/ROADMAP.md)
+- Plugin repository: [iLLucionist/sidepanes.nvim](https://github.com/iLLucionist/sidepanes.nvim/tree/plugin-extraction)
 
 Quick commands:
 
@@ -24,6 +23,9 @@ Quick commands:
 :Sidepanes ipython
 :Sidepanes width 100
 :Sidepanes width next
+:Sidepanes width previous
+:Sidepanes width +
+:Sidepanes width -
 :Sidepanes width pick
 :Sidepanes ask
 ```
