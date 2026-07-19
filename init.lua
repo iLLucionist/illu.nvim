@@ -118,6 +118,11 @@ require("lazy").setup({
     -- REPL
     "hkupty/iron.nvim",
     "nyngwang/NeoZoom.lua",
+    {
+        "iLLucionist/sidepanes.nvim",
+        branch = "plugin-extraction",
+        lazy = false,
+    },
     -- TAILWIND
     "luckasRanarison/tailwind-tools.nvim",
     -- Markdown
@@ -134,6 +139,11 @@ require("lazy").setup({
     }
 })
 set.rtp:prepend(config_dir)
+
+local sidepanes_plugin_path = vim.fn.stdpath("data") .. "/lazy/sidepanes.nvim"
+if vim.loop.fs_stat(sidepanes_plugin_path) then
+    set.rtp:prepend(sidepanes_plugin_path)
+end
 
 -- Essential key mappings
 map('n', '<Cr>', 'i', { silent = true })

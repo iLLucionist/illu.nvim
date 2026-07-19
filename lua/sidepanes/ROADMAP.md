@@ -42,6 +42,14 @@ Recently completed or in progress:
 - Pane-local smart `gf` is owned by `lua/sidepanes/smart_gf.lua`; the old `lua/smart_gf` shim has been removed.
 - Markdown reflow is owned by `lua/sidepanes/markdown_reflow.lua`; the old `lua/markdown_reflow` shim has been removed.
 - `:checkhealth sidepanes` reports global and pane-local mapping modes.
+- Extraction boundary audit is complete.
+- `sidepanes.nvim` has a standalone `plugin-extraction` branch pushed to
+  GitHub at `3dd5fbc`.
+- Standalone `tests/run_checks.sh fast` and `tests/run_checks.sh full` pass
+  from the extracted repository.
+- `illu.nvim` installs `iLLucionist/sidepanes.nvim` from GitHub and prepends
+  lazy.nvim's installed plugin path so the GitHub checkout wins over the
+  retained local fallback source.
 
 ## Roadmap
 
@@ -167,6 +175,8 @@ Possible work:
 
 #### 5.1 Extraction Boundary Audit
 
+Status: completed.
+
 Prove `lua/sidepanes/**` can stand on its own outside `illu.nvim`.
 
 Check for:
@@ -184,6 +194,16 @@ Acceptance:
 - The `sidepanes` module tree can be copied into another Neovim config and loaded with `require("sidepanes").setup(...)`.
 - Markdown reflow works through `require("sidepanes.markdown_reflow").setup(...)`.
 - Personal `init.lua` remains only a consumer of the public setup/config surface.
+
+Completed audit results:
+
+- Runtime modules only require `sidepanes.*` modules plus optional Telescope
+  picker modules.
+- Hardcoded personal runtime paths were removed from the standalone tests.
+- Standalone tests resolve the repository root dynamically.
+- The standalone audit smoke exercises public `setup()` instead of loading
+  personal `init.lua`.
+- README and docs in `sidepanes.nvim` are written for plugin users.
 
 #### 5.2 Fold Markdown Reflow Into Sidepanes
 
@@ -215,7 +235,7 @@ Acceptance:
 
 #### 5.3 Split `sidepanes.nvim`
 
-Status: next major pass.
+Status: completed for the first extraction pass.
 
 Create a dedicated Sidepanes plugin repo:
 
@@ -263,6 +283,17 @@ Acceptance:
 
 - `sidepanes.nvim` runs its checks as a standalone repo.
 - `illu.nvim` can install it from GitHub and keep the current Sidepanes workflow.
+
+Completed:
+
+- Created sibling checkout at `../sidepanes.nvim`.
+- Copied only plugin-owned files: `lua/sidepanes/**`, Sidepanes docs, Sidepanes
+  tests, README, and license.
+- Did not copy personal `init.lua` or unrelated `lua/svelte_*` modules.
+- Committed the standalone extraction as `3dd5fbc` and pushed
+  `origin/plugin-extraction`.
+- Verified `:help sidepanes` through a standalone help smoke.
+- Verified standalone `fast` and `full` checks.
 
 Concrete migration sequence:
 
@@ -363,6 +394,8 @@ tests/run_checks.sh fast
 tests/run_checks.sh full
 ```
 
+Status: completed for local standalone checks.
+
 Fast checks:
 
 - Lua regression tests.
@@ -376,6 +409,9 @@ Full checks:
 - External formatter smoke for built-in Markdown reflow when `mdfmt` exists.
 
 #### 5.6 Update `illu.nvim` To Consume GitHub Plugins
+
+Status: in progress; GitHub plugin path is active and accepted, local source is
+retained as backup until a later cleanup pass.
 
 After the standalone repo works locally, update personal config to install it from GitHub.
 
@@ -404,6 +440,14 @@ Acceptance:
 - `illu.nvim` no longer needs local `lua/sidepanes/**` source.
 - Existing mappings and commands still work from the GitHub-installed plugins.
 - Existing Sidepanes and Markdown reflow tests pass before removing local source.
+
+Current verification:
+
+- Headless startup asserted `require("sidepanes")` loads from
+  `/Users/maximl/.local/share/nvim/lazy/sidepanes.nvim/lua/sidepanes/init.lua`.
+- Existing `tests/run_sidepanes_checks.sh` passes with the GitHub-installed
+  plugin path active.
+- Local `lua/sidepanes/**` has not been removed.
 
 #### 5.7 Dependency Contract Pass
 
