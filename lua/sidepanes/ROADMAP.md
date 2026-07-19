@@ -419,7 +419,7 @@ Target lazy.nvim shape:
 
 ```lua
 {
-  "yourname/sidepanes.nvim",
+  "iLLucionist/sidepanes.nvim",
   config = function()
     require("sidepanes").setup({
       -- current personal Sidepanes config
