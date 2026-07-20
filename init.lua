@@ -14,6 +14,7 @@ local map = vim.keymap.set
 local cmd = vim.cmd
 local config_file = debug.getinfo(1, "S").source:sub(2)
 local config_dir = vim.fn.fnamemodify(vim.loop.fs_realpath(config_file) or config_file, ":p:h")
+local sidepanes_plugin_path = vim.fn.fnamemodify(config_dir .. "/../sidepanes.nvim", ":p")
 
 -- Init package manager
 local lazypath = vim.fn.stdpath("data") .. "/lazy/lazy.nvim"
@@ -119,7 +120,8 @@ require("lazy").setup({
     "hkupty/iron.nvim",
     "nyngwang/NeoZoom.lua",
     {
-        "iLLucionist/sidepanes.nvim",
+        dir = sidepanes_plugin_path,
+        name = "sidepanes.nvim",
         lazy = false,
     },
     -- TAILWIND
@@ -139,7 +141,6 @@ require("lazy").setup({
 })
 set.rtp:prepend(config_dir)
 
-local sidepanes_plugin_path = vim.fn.stdpath("data") .. "/lazy/sidepanes.nvim"
 if vim.loop.fs_stat(sidepanes_plugin_path) then
     set.rtp:prepend(sidepanes_plugin_path)
 end

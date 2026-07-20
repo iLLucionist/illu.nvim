@@ -1,6 +1,6 @@
 --[[
 sidepanes_integration_smoke
-Purpose: Verify illu.nvim consumes the GitHub-installed sidepanes.nvim plugin.
+Purpose: Verify illu.nvim consumes the sibling sidepanes.nvim checkout.
 Does: Checks the loaded module path, a few personal commands and mappings, help resolution, and Sidepanes health.
 Architecture: Keeps plugin behavior coverage in sidepanes.nvim and tests only this config's lazy.nvim integration boundary.
 ]]
