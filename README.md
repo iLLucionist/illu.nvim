@@ -4,7 +4,7 @@ Lua-based Neovim configuration and small local helpers.
 
 ## Sidepanes
 
-`sidepanes.nvim` is loaded from the sibling `../sidepanes.nvim` checkout and keeps a Markdown viewer, Codex,
+`sidepanes.nvim` is installed from GitHub at `v0.2.0` and keeps a Markdown viewer, Codex,
 Claude, and IPython in one reusable side pane.
 
 Docs:

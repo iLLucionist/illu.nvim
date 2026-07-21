@@ -2,12 +2,13 @@
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-PLUGIN_DIR="${ILLU_SIDEPANES_RUNTIME_PATH:-${ROOT_DIR}/../sidepanes.nvim}"
+PLUGIN_DIR="${ILLU_SIDEPANES_RUNTIME_PATH:-${HOME}/.local/share/nvim/lazy/sidepanes.nvim}"
 TMP_ROOT="${TMPDIR:-/tmp}"
 TMP_ROOT="${TMP_ROOT%/}"
 
 if [ ! -d "$PLUGIN_DIR/lua/sidepanes" ]; then
-    printf 'missing local sidepanes.nvim runtime: %s\n' "$PLUGIN_DIR" >&2
+    printf 'missing installed sidepanes.nvim runtime: %s\n' "$PLUGIN_DIR" >&2
+    printf 'run :Lazy sync sidepanes.nvim from Neovim, then retry\n' >&2
     exit 1
 fi
 
