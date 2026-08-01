@@ -4,7 +4,7 @@ Lua-based Neovim configuration and small local helpers.
 
 ## Sidepanes
 
-`sidepanes.nvim` is installed from GitHub at `v0.2.0` and keeps a Markdown viewer, Codex,
+`sidepanes.nvim` is installed from GitHub and keeps a Markdown viewer, Codex,
 Claude, and IPython in one reusable side pane.
 
 Docs:
@@ -28,6 +28,8 @@ Quick commands:
 :Sidepanes width -
 :Sidepanes width pick
 :Sidepanes ask
+:Sidepanes ask-append
+:Sidepanes submit-question
 ```
 
 Quick API:
@@ -37,6 +39,12 @@ local sidepanes = require("sidepanes")
 
 sidepanes.setup({
   commands = true,
+  ask = {
+    ui = "pane",
+    auto_append = true,
+    duplicate_policy = "skip",
+    model_picker = "before_send",
+  },
   mappings = {
     global = {
       toggle = "<leader>pp",
@@ -53,7 +61,17 @@ sidepanes.setup({
       width_picker = "<leader>pw",
       sticky_relative_width = "<leader>p%",
       send_ipython = "<leader>pl",
+      ask_pane = "<leader>pa",
       ask = "<leader>pa",
+    },
+    pane = {
+      ask_pane = "ap",
+      headings = "fm",
+      ask_submit = "<C-CR>",
+      ask_send = "qq",
+      ask_send_alt = "<leader>qq",
+      ask_model_picker = "M",
+      ask_model_picker_alt = "<Tab>",
     },
   },
 })

@@ -121,7 +121,6 @@ require("lazy").setup({
     {
         "iLLucionist/sidepanes.nvim",
         name = "sidepanes.nvim",
-        version = "v0.2.0",
         lazy = false,
     },
     -- TAILWIND
@@ -173,6 +172,50 @@ map("n", "<leader>tsj", function()
     vim.cmd("belowright" .. height .. "split | terminal")
     vim.cmd("startinsert")
 end)
+
+local function toggle_markdown_task_marker(target_marker, start_lnum, end_lnum)
+    local bufnr = vim.api.nvim_get_current_buf()
+    start_lnum = start_lnum or vim.fn.line(".")
+    end_lnum = end_lnum or start_lnum
+
+    if start_lnum > end_lnum then
+        start_lnum, end_lnum = end_lnum, start_lnum
+    end
+
+    local changed = false
+    for lnum = start_lnum, end_lnum do
+        local line = vim.api.nvim_buf_get_lines(bufnr, lnum - 1, lnum, false)[1]
+        local prefix, marker, suffix = line:match("^(%s*[-*+]%s*%[)([ xX!])(%]%s*)")
+
+        if prefix then
+            local next_marker = target_marker
+            if marker:upper() == target_marker then
+                next_marker = " "
+            end
+
+            local rest = line:sub(#prefix + #marker + #suffix + 1)
+            vim.api.nvim_buf_set_lines(bufnr, lnum - 1, lnum, false, { prefix .. next_marker .. suffix .. rest })
+            changed = true
+        end
+    end
+
+    if not changed then
+        vim.notify("No markdown task item under cursor or selection", vim.log.levels.INFO)
+    end
+end
+
+map('n', 'mc', function()
+    toggle_markdown_task_marker("X")
+end, { desc = "Toggle markdown task checked" })
+map('x', 'mc', function()
+    toggle_markdown_task_marker("X", vim.fn.line("'<"), vim.fn.line("'>"))
+end, { desc = "Toggle selected markdown tasks checked" })
+map('n', 'mb', function()
+    toggle_markdown_task_marker("!")
+end, { desc = "Toggle markdown task bug found" })
+map('x', 'mb', function()
+    toggle_markdown_task_marker("!", vim.fn.line("'<"), vim.fn.line("'>"))
+end, { desc = "Toggle selected markdown tasks bug found" })
 
 
 
@@ -397,6 +440,12 @@ sidepanes.setup({
         shutdown_on_exit = true,
         shutdown_timeout_ms = 300,
     },
+    ask = {
+        ui = "pane",
+        auto_append = true,
+        duplicate_policy = "skip",
+        model_picker = "before_send",
+    },
     validation = {
         enabled = true,
     },
@@ -416,6 +465,8 @@ sidepanes.setup({
         zoom = "SidepanesZoom",
         width_picker = "SidepanesWidthPick",
         ask = "SidepanesAsk",
+        ask_append = "SidepanesAskAppend",
+        submit_question = "SidepanesSubmitQuestion",
         ask_codex = "SidepanesAskCodex",
         ask_claude = "SidepanesAskClaude",
     },
@@ -438,6 +489,7 @@ sidepanes.setup({
             width_picker = "<leader>pw",
             sticky_relative_width = "<leader>p%",
             switch = "<leader>ps",
+            ask_pane = "<leader>pa",
             ask = "<leader>pa",
             ask_last = "aa",
             ask_codex = "ax",
@@ -451,9 +503,21 @@ sidepanes.setup({
             toggle_terminal = "<leader>gg",
             toggle_terminal_alt = "<C-g>",
             ipython_alt = "<leader>gi",
+            headings = "fm",
             gf = "gf",
             send_ipython = "ll",
             zoom = "zz",
+            ask_pane = "ap",
+            ask_submit = "<C-CR>",
+            ask_send = "qq",
+            ask_send_alt = "<leader>qq",
+            ask_next_file = "]f",
+            ask_previous_file = "[f",
+            ask_next_selection = "]s",
+            ask_previous_selection = "[s",
+            ask_source = "gf",
+            ask_model_picker = "M",
+            ask_model_picker_alt = "<Tab>",
             ask_last = "aa",
             ask_codex = "ax",
             ask_claude = "ac",

@@ -2,7 +2,8 @@
 set -eu
 
 ROOT_DIR="$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-PLUGIN_DIR="${ILLU_SIDEPANES_RUNTIME_PATH:-${HOME}/.local/share/nvim/lazy/sidepanes.nvim}"
+DEFAULT_PLUGIN_DIR="${HOME}/.local/share/nvim/lazy/sidepanes.nvim"
+PLUGIN_DIR="${ILLU_SIDEPANES_RUNTIME_PATH:-${DEFAULT_PLUGIN_DIR}}"
 TMP_ROOT="${TMPDIR:-/tmp}"
 TMP_ROOT="${TMP_ROOT%/}"
 
